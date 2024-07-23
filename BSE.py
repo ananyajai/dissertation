@@ -2040,22 +2040,16 @@ class RLAgent(Trader):
                     profit = random.choice(self.action_space)
                     quote = self.orders[0].price * (1 - profit)
                 elif self.type == 'Seller':
-                    action = random.choice(self.action_space)
-                    if action == 0.1:
-                        quote = self.orders[0].price * (1 + action)
-                    else:
-                        quote = bse_sys_maxprice
+                    profit = random.choice(self.action_space)
+                    quote = self.orders[0].price * (1 + profit)
             # Exploit - choose the action with the highest probability
             else:
                 if self.type == 'Buyer':
                     profit = max(list(range(self.num_actions)), key = lambda x: self.q_table[(obs, x)])
                     quote = self.orders[0].price * (1 - profit)
                 elif self.type == 'Seller':
-                    action = max(list(range(self.num_actions)), key = lambda x: self.q_table[(obs, x)])
-                    if action == 0.1:
-                        quote = self.orders[0].price * (1 + action)
-                    else:
-                        quote = bse_sys_maxprice
+                    profit = max(list(range(self.num_actions)), key = lambda x: self.q_table[(obs, x)])
+                    quote = self.orders[0].price * (1 + profit)
 
             # Check if it's a bad bid
             if self.type == 'Buyer' and quote > self.orders[0].price:
@@ -2074,7 +2068,7 @@ class RLAgent(Trader):
             
             # Write the current state, action and reward
             # obs = get_discrete_state(self.type, lob, time, self.orders[0].price)
-            # action = profit
+            action = profit
             reward = 0.0
             with open(file, 'a', newline='') as f:
                 writer = csv.writer(f)
@@ -2352,7 +2346,7 @@ def populate_market(traders_spec, traders, shuffle, verbose):
             return Trader_PRZI('PRDE', name, balance, parameters, time0)
         elif robottype == 'RL':
             return RLAgent('RL', name, balance, parameters, time0, 
-                           action_space=[0.1, 1.0], 
+                           action_space=[0.0, 0.1], 
                            obs_space=spaces.MultiDiscrete([120, 100, 10, 10, 10, 10, 10, 10]))
         elif robottype == 'REINFORCE':
             return Reinforce('REINFORCE', name, balance, parameters, time0, 
