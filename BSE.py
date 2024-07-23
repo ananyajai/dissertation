@@ -72,7 +72,7 @@ from neural_network import Network
 
 # a bunch of system constants (globals)
 bse_sys_minprice = 1                    # minimum price in the system, in cents/pennies
-bse_sys_maxprice = 200                    # maximum price in the system, in cents/pennies
+bse_sys_maxprice = 9                    # maximum price in the system, in cents/pennies
 # ticksize should be a param of an exchange (so different exchanges have different ticksizes)
 ticksize = 1  # minimum change in price, in cents/pennies
 
@@ -1924,19 +1924,6 @@ class RLAgent(Trader):
         self.current_obs = obs
 
 
-    def epsilon_decay(self, strat, eps_start=1.0, eps_min=0.05, eps_decay=0.99):
-        self.epsilon = eps_start
-
-        if strat == 'constant':
-            self.epsilon = 0.9
-
-        if strat == 'linear':
-            self.epsilon = max(eps_min, self.epsilon - eps_decay)
-
-        if strat == 'exponential':
-            self.epsilon = max(eps_min, eps_decay*self.epsilon)
-
-
     @classmethod
     def load_q_table(self, file_path: str) -> DefaultDict:
         """
@@ -2359,7 +2346,7 @@ def populate_market(traders_spec, traders, shuffle, verbose):
             return Trader_PRZI('PRDE', name, balance, parameters, time0)
         elif robottype == 'RL':
             return RLAgent('RL', name, balance, parameters, time0, 
-                           action_space=[0.03, 0.06, 0.09, 0.12, 0.15], 
+                           action_space=[0.0, 0.1], 
                            obs_space=spaces.MultiDiscrete([120, 100, 10, 10, 10, 10, 10, 10]))
         elif robottype == 'REINFORCE':
             return Reinforce('REINFORCE', name, balance, parameters, time0, 
