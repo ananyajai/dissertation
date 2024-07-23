@@ -107,12 +107,13 @@ def evaluate(episodes: int, market_params: tuple, q_table: DefaultDict, file) ->
         total_return += balance
     
     mean_return = total_return / episodes
-    mean_return_list.append(mean_return)
 
-    return mean_return, mean_return_list
+    return mean_return
 
 
 def train(total_eps: int, market_params: tuple, eval_freq: int, epsilon) -> DefaultDict:
+    mean_return_list = []
+
     for episode in range(1, total_eps + 1):
         market_session(*market_params)
         
@@ -157,19 +158,20 @@ def train(total_eps: int, market_params: tuple, eval_freq: int, epsilon) -> Defa
             #     q_table='q_table_buyer.csv', file='episode_buyer.csv'
             #     )
             
-            mean_return_seller, mean_return_list = evaluate(
+            mean_return_seller = evaluate(
                 episodes=CONFIG['eval_episodes'], market_params=market_params, 
                 q_table='q_table_seller.csv', file='episode_seller.csv'
                 )
             tqdm.write(f"EVALUATION: EP {episode} - MEAN RETURN SELLER {mean_return_seller}")
+            mean_return_list.append(mean_return_seller)
     
-    return q_table_seller
+    return q_table_seller, mean_return_list
 
 
 CONFIG = {
     "total_eps": 200000,
-    "eval_freq": 20000,
-    "eval_episodes": 10000,
+    "eval_freq": 5000,
+    "eval_episodes": 500,
     "gamma": 1.0,
     "epsilon": 1.0,
 }
@@ -179,8 +181,8 @@ sess_id = 'session_1'
 start_time = 0.0
 end_time = 30.0
 
-sellers_spec = [('ZIC', 9), ('RL', 1, {'epsilon': 1.0})]
-buyers_spec = [('ZIC', 10)]
+sellers_spec = [('GVWY', 9), ('RL', 1, {'epsilon': 1.0})]
+buyers_spec = [('GVWY', 10)]
 
 trader_spec = {'sellers': sellers_spec, 'buyers': buyers_spec}
 
@@ -201,8 +203,16 @@ verbose = False
 
 
 # Training the RL agent with evaluation
-q_table = train(total_eps=CONFIG['total_eps'], 
-                market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
-                eval_freq=CONFIG['eval_freq'],
-                epsilon=CONFIG['epsilon'])
+q_table, mean_return_list = train(total_eps=CONFIG['total_eps'], 
+                                market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
+                                eval_freq=CONFIG['eval_freq'],
+                                epsilon=CONFIG['epsilon'])
+
+
+x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps']+1, CONFIG['eval_freq'])
+plt.plot(x_ticks, mean_return_list, linewidth=1.0)
+plt.title("Mean returns - Q-table")
+plt.xlabel("Episode number")
+# plt.savefig("mean_returns.png")
+plt.show()
 
