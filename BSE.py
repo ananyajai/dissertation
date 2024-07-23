@@ -133,7 +133,7 @@ def get_discrete_state(type, lob, time, order):
     # observation = np.array([type, float(order), float(best_bid), float(best_ask), float(worst_bid), 
     #                         float(worst_ask), float(avg_bid), float(avg_ask)])
 
-    observation = np.array([type, float(order), float(best_bid), float(best_ask)])
+    observation = np.array([type, float(order), float(best_bid), float(best_ask), float(avg_bid), float(avg_ask)])
     
     return observation
 

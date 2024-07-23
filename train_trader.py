@@ -83,7 +83,7 @@ def evaluate(episodes: int, market_params: tuple, q_table: DefaultDict, file) ->
     total_return = 0.0
     mean_return_list = []
 
-    updated_market_params = list(market_params)    
+    updated_market_params = list(market_params)
     # if file == 'q_table_buyer.csv':
     #     updated_market_params[3]['buyers'][0][2]['q_table_buyer'] = 'q_table_buyer.csv'
     #     updated_market_params[3]['buyers'][0][2]['epsilon'] = 0.0                           # No exploring
@@ -169,9 +169,9 @@ def train(total_eps: int, market_params: tuple, eval_freq: int, epsilon) -> Defa
 
 
 CONFIG = {
-    "total_eps": 200,
-    "eval_freq": 50,
-    "eval_episodes": 50,
+    "total_eps": 200000,
+    "eval_freq": 5000,
+    "eval_episodes": 500,
     "gamma": 1.0,
     "epsilon": 1.0,
 }
@@ -213,6 +213,6 @@ x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps']+1, CONFIG['eval_fre
 plt.plot(x_ticks, mean_return_list, linewidth=1.0)
 plt.title("Mean returns - Q-table")
 plt.xlabel("Episode number")
-# plt.savefig("mean_returns.png")
-plt.show()
+plt.savefig("mean_returns.png")
+# plt.show()
 
