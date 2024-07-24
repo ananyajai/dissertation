@@ -43,6 +43,14 @@ def load_episode_data(file: str) -> Tuple[List[np.ndarray], List[float], List[fl
     return obs_list, action_list, reward_list
 
 
+def q_value_function(state, action):
+        action_one_hot = torch.zeros(action_size)
+        action_one_hot[action] = 1
+        state_action = torch.cat([state, action_one_hot])
+        q_value = value_net(state_action.unsqueeze(0))
+        return q_value.item()
+
+
 def update(
         observations: List[np.ndarray], actions: List[int], rewards: List[float],
         ) -> Dict[str, float]:
@@ -57,17 +65,23 @@ def update(
         reward_mean = np.mean(rewards)
         reward_std = np.std(rewards) + 1e-10  # Add a small value to avoid division by zero
         normalised_rewards = (rewards - reward_mean) / reward_std
-    
-        # Flatten each observation
+
+        # Flatten each observation and create one-hot encodings for actions
         flattened_observations = [obs.flatten() for obs in observations]
+        one_hot_actions = [np.eye(action_size, dtype=int)[int(action)] for action in actions]
         
-        # Convert observations to a tensor
-        obs_tensor = torch.tensor(flattened_observations, dtype=torch.float32)
+        # Concatenate flattened observations with one-hot actions
+        state_action_pairs = [np.concatenate((obs, act)) for obs, act in zip(flattened_observations, one_hot_actions)]
+        
+        # Convert state-action pairs to a tensor
+        state_action_tensor = torch.tensor(state_action_pairs, dtype=torch.float32)
+
+        # Compute baseline values using the current value network
+        baseline_values = value_net(state_action_tensor).squeeze()
 
         # Compute action probabilities using the current policy
         eps = 1e-10
-        action_probabilities = policy_net(obs_tensor) + eps
-        baseline_values = value_net(obs_tensor).squeeze()
+        # action_probabilities = policy_net(obs_tensor) + eps
         
         # Precompute returns G for every timestep
         G = [ 0 for n in range(traj_length) ]
@@ -77,14 +91,14 @@ def update(
 
         G = torch.tensor(G, dtype=torch.float32)
         advantage = G - baseline_values
-        p_loss = torch.mean(-advantage * torch.log(action_probabilities[torch.arange(traj_length), actions]))
+        # p_loss = torch.mean(-advantage * torch.log(action_probabilities[torch.arange(traj_length), actions]))
         v_loss = F.mse_loss(baseline_values, G)
 
         # Backpropogate and perform optimisation step for the policy
-        policy_optim.zero_grad()
-        p_loss.backward(retain_graph=True)
-        torch.nn.utils.clip_grad_norm_(policy_net.parameters(), max_norm=1.0)       # Gradient clipping
-        policy_optim.step()
+        # policy_optim.zero_grad()
+        # p_loss.backward(retain_graph=True)
+        # torch.nn.utils.clip_grad_norm_(policy_net.parameters(), max_norm=1.0)       # Gradient clipping
+        # policy_optim.step()
 
         # Backpropogate and perform optimisation step for the value function
         value_optim.zero_grad()
@@ -92,7 +106,7 @@ def update(
         torch.nn.utils.clip_grad_norm_(value_net.parameters(), max_norm=1.0)       # Gradient clipping
         value_optim.step()
         
-        return {"p_loss": float(p_loss), "v_loss": float(v_loss)}
+        return {"v_loss": float(v_loss)}
 
 
 def train(total_eps: int, market_params: tuple, eval_freq: int, epsilon) -> DefaultDict:
@@ -124,18 +138,18 @@ def train(total_eps: int, market_params: tuple, eval_freq: int, epsilon) -> Defa
             
             mean_return_seller = evaluate(
                 episodes=CONFIG['eval_episodes'], market_params=market_params, 
-                policy=policy_net, file='episode_seller.csv')
+                value_net=value_net, file='episode_seller.csv')
             tqdm.write(f"EVALUATION: EP {episode} - MEAN RETURN SELLER {mean_return_seller}")
             mean_return_list.append(mean_return_seller)
 
     return stats, mean_return_list
 
 
-def evaluate(episodes: int, market_params: tuple, policy, file) -> float:
+def evaluate(episodes: int, market_params: tuple, value_net, file) -> float:
     total_return = 0.0
 
     updated_market_params = list(market_params)    
-    updated_market_params[3]['sellers'][1][2]['policy'] = policy
+    updated_market_params[3]['sellers'][1][2]['value_func'] = value_net
     updated_market_params[3]['sellers'][1][2]['epsilon'] = 0.0         # No exploring
 
     for _ in range(episodes):
@@ -157,20 +171,21 @@ def evaluate(episodes: int, market_params: tuple, policy, file) -> float:
     return mean_return
      
 
-policy_net = Network(
-    dims=(40, 32, 21), output_activation=nn.Softmax(dim=-1)
-    )
+action_size = 21
+# policy_net = Network(
+#     dims=(40, 32, 21), output_activation=nn.Softmax(dim=-1)
+#     )
 
-value_net = Network(dims=(40, 32, 32, 1), output_activation=None)
-        
-policy_optim = Adam(policy_net.parameters(), lr=1e-4, eps=1e-3)
+value_net = Network(dims=(61, 32, 1), output_activation=None)
+
+# policy_optim = Adam(policy_net.parameters(), lr=1e-4, eps=1e-3)
 value_optim = Adam(value_net.parameters(), lr=1e-4, eps=1e-3)
 
 
 CONFIG = {
     "total_eps": 50000,
     "eval_freq": 2500,
-    "eval_episodes": 1000,
+    "eval_episodes": 500,
     "gamma": 1.0,
     "epsilon": 1.0,
 }
@@ -180,7 +195,7 @@ sess_id = 'session_1'
 start_time = 0.0
 end_time = 60.0
 
-sellers_spec = [('GVWY', 9), ('REINFORCE', 1, {'epsilon': 1.0, 'policy': policy_net})]
+sellers_spec = [('GVWY', 9), ('REINFORCE', 1, {'epsilon': 1.0, 'value_func': value_net})]
 buyers_spec = [('GVWY', 10)]
 
 trader_spec = {'sellers': sellers_spec, 'buyers': buyers_spec}
@@ -192,7 +207,7 @@ range2 = (50, 150)
 demand_schedule = [{'from': start_time, 'to': end_time, 'ranges': [range2], 'stepmode': 'fixed'}]
 
 # new customer orders arrive at each trader approx once every order_interval seconds
-order_interval = 15
+order_interval = 60
 
 order_schedule = {'sup': supply_schedule, 'dem': demand_schedule,
                 'interval': order_interval, 'timemode': 'drip-poisson'}
@@ -214,19 +229,19 @@ plt.title("Policy Loss vs Episode")
 plt.xlabel("Episode number")
 # plt.savefig("policy_loss.png")
 # plt.close()
-plt.show()
+# plt.show()
 
 value_loss = training_stats['v_loss']
 plt.plot(value_loss, linewidth=1.0)
 plt.title("Value Loss vs Episode")
 plt.xlabel("Episode number")
-# plt.savefig("value_loss.png")
-# plt.close()
-plt.show()
+plt.savefig("value_loss.png")
+plt.close()
+# plt.show()
 
 x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps']+1, CONFIG['eval_freq'])
 plt.plot(x_ticks, eval_returns_list, linewidth=1.0)
 plt.title("Mean returns - REINFORCE")
 plt.xlabel("Episode number")
-# plt.savefig("mean_returns.png")
-plt.show()
+plt.savefig("mean_returns.png")
+# plt.show()

@@ -72,7 +72,7 @@ from neural_network import Network
 
 # a bunch of system constants (globals)
 bse_sys_minprice = 1                    # minimum price in the system, in cents/pennies
-bse_sys_maxprice = 9                    # maximum price in the system, in cents/pennies
+bse_sys_maxprice = 200                    # maximum price in the system, in cents/pennies
 # ticksize should be a param of an exchange (so different exchanges have different ticksizes)
 ticksize = 1  # minimum change in price, in cents/pennies
 
@@ -2132,16 +2132,19 @@ class Reinforce(RLAgent):
         self.profit_stepsize = 1/(self.action_size - 1)
         self.max_length = 0
 
-        self.policy = Network(
-            dims=(self.state_size, self.action_size), output_activation=nn.Softmax(dim=-1)
-            )
+        self.q_network = Network(dims=(self.state_size + self.action_size, 32, 1))
+        self.value_optim = Adam(self.q_network.parameters(), lr=learning_rate, eps=1e-3)
+
+        # self.policy = Network(
+        #     dims=(self.state_size, self.action_size), output_activation=nn.Softmax(dim=-1)
+        #     )
         
-        self.policy_optim = Adam(self.policy.parameters(), lr=learning_rate, eps=1e-3)
+        # self.policy_optim = Adam(self.policy.parameters(), lr=learning_rate, eps=1e-3)
 
         # Check if they gave different parameters
         if type(params) is dict:
-            if 'policy' in params:
-                self.policy = params['policy']
+            if 'value_func' in params:
+                self.q_network = params['value_func']
             if 'epsilon' in params:
                 self.epsilon = params['epsilon']
 
@@ -2180,59 +2183,116 @@ class Reinforce(RLAgent):
         return padded_lob[:max_length]
 
 
+    def q_value_function(self, state, action):
+        action_one_hot = torch.zeros(self.action_size)
+        action_one_hot[action] = 1
+        state_action = torch.cat([state, action_one_hot])
+        q_value = self.q_network(state_action.unsqueeze(0))
+        return q_value.item()
+    
+
     def getorder(self, time, countdown, lob):
         if len(self.orders) < 1:
             order = None
-
         else:
             order_type = self.orders[0].otype
 
             # Extract relevant features from the lob
             obs = self.preprocess_lob(lob)
             state = torch.tensor(obs, dtype=torch.float32).flatten()
-            action_prob = self.policy(state)
 
-            # Explore - sample a random action
+            # Use epsilon-greedy strategy for action selection
             if random.uniform(0, 1) < self.epsilon:
-                if self.type == 'Buyer':
-                    action = self.action_space.sample()
-                    quote = self.orders[0].price * (1 - self.profit_stepsize*action)
-                elif self.type == 'Seller':
-                    action = self.action_space.sample()
-                    quote = self.orders[0].price * (1 + self.profit_stepsize*action)
-
-            # Exploit - choose the action with the highest probability
+                # Explore: sample a random action
+                action = self.action_space.sample()
             else:
-                if self.type == 'Buyer':
-                    action = torch.argmax(action_prob).item()
-                    quote = self.orders[0].price * (1 - self.profit_stepsize*action)
-                elif self.type == 'Seller':
-                    action = torch.argmax(action_prob).item()
-                    quote = self.orders[0].price * (1 + self.profit_stepsize*action)
+                # Exploit: select the action with the highest Q-value
+                q_values = [self.q_value_function(state, action) for action in range(self.action_size)]
+                action = np.argmax(q_values)
+
+            # Calculate the quote based on the action
+            if self.type == 'Buyer':
+                quote = self.orders[0].price * (1 - self.profit_stepsize * action)
+            elif self.type == 'Seller':
+                quote = self.orders[0].price * (1 + self.profit_stepsize * action)
 
             # Check if it's a bad bid
             if self.type == 'Buyer' and quote > self.orders[0].price:
                 quote = self.orders[0].price
-            
+
             # Check if it's a bad ask
             elif self.type == 'Seller' and quote < self.orders[0].price:
                 quote = self.orders[0].price
 
-            order = Order(self.tid, order_type, (quote), self.orders[0].qty, time, lob['QID'])
+            order = Order(self.tid, order_type, quote, self.orders[0].qty, time, lob['QID'])
 
             if self.type == 'Buyer':
                 file = 'episode_buyer.csv'
             elif self.type == 'Seller':
                 file = 'episode_seller.csv'
-            
-            # Write the current state, action and reward
+
+            # Write the current state, action, and reward
             reward = 0.0
             with open(file, 'a', newline='') as f:
                 writer = csv.writer(f)
                 writer.writerow([obs, action, reward])
-        
 
         return order
+
+
+    # def getorder(self, time, countdown, lob):
+    #     if len(self.orders) < 1:
+    #         order = None
+
+    #     else:
+    #         order_type = self.orders[0].otype
+
+    #         # Extract relevant features from the lob
+    #         obs = self.preprocess_lob(lob)
+    #         state = torch.tensor(obs, dtype=torch.float32).flatten()
+    #         action_prob = self.policy(state)
+
+    #         # Explore - sample a random action
+    #         if random.uniform(0, 1) < self.epsilon:
+    #             if self.type == 'Buyer':
+    #                 action = self.action_space.sample()
+    #                 quote = self.orders[0].price * (1 - self.profit_stepsize*action)
+    #             elif self.type == 'Seller':
+    #                 action = self.action_space.sample()
+    #                 quote = self.orders[0].price * (1 + self.profit_stepsize*action)
+
+    #         # Exploit - choose the action with the highest probability
+    #         else:
+    #             if self.type == 'Buyer':
+    #                 action = torch.argmax(action_prob).item()
+    #                 quote = self.orders[0].price * (1 - self.profit_stepsize*action)
+    #             elif self.type == 'Seller':
+    #                 action = torch.argmax(action_prob).item()
+    #                 quote = self.orders[0].price * (1 + self.profit_stepsize*action)
+
+    #         # Check if it's a bad bid
+    #         if self.type == 'Buyer' and quote > self.orders[0].price:
+    #             quote = self.orders[0].price
+            
+    #         # Check if it's a bad ask
+    #         elif self.type == 'Seller' and quote < self.orders[0].price:
+    #             quote = self.orders[0].price
+
+    #         order = Order(self.tid, order_type, (quote), self.orders[0].qty, time, lob['QID'])
+
+    #         if self.type == 'Buyer':
+    #             file = 'episode_buyer.csv'
+    #         elif self.type == 'Seller':
+    #             file = 'episode_seller.csv'
+            
+    #         # Write the current state, action and reward
+    #         reward = 0.0
+    #         with open(file, 'a', newline='') as f:
+    #             writer = csv.writer(f)
+    #             writer.writerow([obs, action, reward])
+        
+
+    #     return order
     
 
     def update(
@@ -2350,7 +2410,7 @@ def populate_market(traders_spec, traders, shuffle, verbose):
                            obs_space=spaces.MultiDiscrete([120, 100, 10, 10, 10, 10, 10, 10]))
         elif robottype == 'REINFORCE':
             return Reinforce('REINFORCE', name, balance, parameters, time0, 
-                           action_space=spaces.Discrete(21), learning_rate=0.01,
+                           action_space=spaces.Discrete(21), learning_rate=1e-3,
                            obs_space=spaces.Box(low=0, high=np.inf, shape=(2, 10, 2), dtype=np.float32))
         else:
             sys.exit('FATAL: don\'t know robot type %s\n' % robottype)
@@ -2413,6 +2473,8 @@ def populate_market(traders_spec, traders, shuffle, verbose):
             parameters = {'epsilon': epsilon}
             if 'policy' in trader_params:
                 parameters['policy'] = trader_params['policy']
+            if 'value_func' in trader_params:
+                parameters['value_func'] = trader_params['value_func']
 
         return parameters
 
