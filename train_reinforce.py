@@ -132,6 +132,8 @@ def train(total_eps: int, market_params: tuple, eval_freq: int, epsilon) -> Defa
         except Exception as e:
             pass
 
+        market_params[3]['sellers'][1][2]['value_func'] = value_net
+
         # Evaluate the policy at specified intervals
         if episode % eval_freq == 0:
             print(f"Episode {episode}: {update_results}")
@@ -171,21 +173,22 @@ def evaluate(episodes: int, market_params: tuple, value_net, file) -> float:
     return mean_return
      
 
-action_size = 21
+state_size = 40
+action_size = 3
 # policy_net = Network(
 #     dims=(40, 32, 21), output_activation=nn.Softmax(dim=-1)
 #     )
 
-value_net = Network(dims=(61, 32, 1), output_activation=None)
+value_net = Network(dims=(state_size+action_size, 32, 1), output_activation=None)
 
 # policy_optim = Adam(policy_net.parameters(), lr=1e-4, eps=1e-3)
 value_optim = Adam(value_net.parameters(), lr=1e-4, eps=1e-3)
 
 
 CONFIG = {
-    "total_eps": 50000,
-    "eval_freq": 2500,
-    "eval_episodes": 500,
+    "total_eps": 100,
+    "eval_freq": 10,
+    "eval_episodes": 10,
     "gamma": 1.0,
     "epsilon": 1.0,
 }
@@ -235,13 +238,13 @@ value_loss = training_stats['v_loss']
 plt.plot(value_loss, linewidth=1.0)
 plt.title("Value Loss vs Episode")
 plt.xlabel("Episode number")
-plt.savefig("value_loss.png")
-plt.close()
-# plt.show()
+# plt.savefig("value_loss.png")
+# plt.close()
+plt.show()
 
 x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps']+1, CONFIG['eval_freq'])
 plt.plot(x_ticks, eval_returns_list, linewidth=1.0)
 plt.title("Mean returns - REINFORCE")
 plt.xlabel("Episode number")
-plt.savefig("mean_returns.png")
+# plt.savefig("mean_returns.png")
 # plt.show()
