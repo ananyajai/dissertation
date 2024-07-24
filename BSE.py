@@ -72,7 +72,7 @@ from neural_network import Network
 
 # a bunch of system constants (globals)
 bse_sys_minprice = 1                    # minimum price in the system, in cents/pennies
-bse_sys_maxprice = 200                    # maximum price in the system, in cents/pennies
+bse_sys_maxprice = 9                    # maximum price in the system, in cents/pennies
 # ticksize should be a param of an exchange (so different exchanges have different ticksizes)
 ticksize = 1  # minimum change in price, in cents/pennies
 
@@ -2040,16 +2040,16 @@ class RLAgent(Trader):
                     profit = random.choice(self.action_space)
                     quote = self.orders[0].price * (1 - profit)
                 elif self.type == 'Seller':
-                    profit = random.choice(self.action_space)
-                    quote = self.orders[0].price * (1 + profit)
+                    # profit = random.choice(self.action_space)
+                    quote = self.orders[0].price
             # Exploit - choose the action with the highest probability
             else:
                 if self.type == 'Buyer':
                     profit = max(list(range(self.num_actions)), key = lambda x: self.q_table[(obs, x)])
                     quote = self.orders[0].price * (1 - profit)
                 elif self.type == 'Seller':
-                    profit = max(list(range(self.num_actions)), key = lambda x: self.q_table[(obs, x)])
-                    quote = self.orders[0].price * (1 + profit)
+                    # profit = max(list(range(self.num_actions)), key = lambda x: self.q_table[(obs, x)])
+                    quote = self.orders[0].price
 
             # Check if it's a bad bid
             if self.type == 'Buyer' and quote > self.orders[0].price:
@@ -2068,7 +2068,7 @@ class RLAgent(Trader):
             
             # Write the current state, action and reward
             # obs = get_discrete_state(self.type, lob, time, self.orders[0].price)
-            action = profit
+            action = quote
             reward = 0.0
             with open(file, 'a', newline='') as f:
                 writer = csv.writer(f)
@@ -2405,7 +2405,7 @@ def populate_market(traders_spec, traders, shuffle, verbose):
             return Trader_PRZI('PRDE', name, balance, parameters, time0)
         elif robottype == 'RL':
             return RLAgent('RL', name, balance, parameters, time0, 
-                           action_space=[0.0, 0.1], 
+                           action_space=[0.0], 
                            obs_space=spaces.MultiDiscrete([120, 100, 10, 10, 10, 10, 10, 10]))
         elif robottype == 'REINFORCE':
             return Reinforce('REINFORCE', name, balance, parameters, time0, 

@@ -8,6 +8,7 @@ from collections import defaultdict
 from typing import List, Dict, DefaultDict, Tuple
 from q_table_data import load_q_table, dump_q_table
 from epsilon_scheduling import epsilon_decay
+import shutil
 
 
 gamma = 1.0
@@ -149,6 +150,10 @@ def train(total_eps: int, market_params: tuple, eval_freq: int, epsilon) -> Defa
 
         market_params[3]['sellers'][1][2]['q_table_seller'] = 'q_table_seller.csv'
         
+        new_file_name = f'q_table_seller_episode_num_{episode}.csv'
+        # Copy the file
+        shutil.copy('q_table_seller.csv', new_file_name)
+
         # Perform evaluation every `eval_freq` episodes
         if episode % eval_freq == 0:
             print(f"Training Episode {episode}/{total_eps}")
@@ -169,8 +174,8 @@ def train(total_eps: int, market_params: tuple, eval_freq: int, epsilon) -> Defa
 
 
 CONFIG = {
-    "total_eps": 200000,
-    "eval_freq": 5000,
+    "total_eps": 5,
+    "eval_freq": 50,
     "eval_episodes": 500,
     "gamma": 1.0,
     "epsilon": 1.0,
@@ -198,7 +203,7 @@ order_interval = 30
 order_schedule = {'sup': supply_schedule, 'dem': demand_schedule,
                 'interval': order_interval, 'timemode': 'drip-poisson'}
 
-dump_flags = {'dump_strats': False, 'dump_lobs': False, 'dump_avgbals': False, 'dump_tape': False, 'dump_blotters': False}
+dump_flags = {'dump_strats': False, 'dump_lobs': False, 'dump_avgbals': False, 'dump_tape': False, 'dump_blotters': True}
 verbose = False
 
 
@@ -209,10 +214,10 @@ q_table, mean_return_list = train(total_eps=CONFIG['total_eps'],
                                 epsilon=CONFIG['epsilon'])
 
 
-x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps']+1, CONFIG['eval_freq'])
-plt.plot(x_ticks, mean_return_list, linewidth=1.0)
-plt.title("Mean returns - Q-table")
-plt.xlabel("Episode number")
-plt.savefig("mean_returns.png")
-# plt.show()
+# x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps']+1, CONFIG['eval_freq'])
+# plt.plot(x_ticks, mean_return_list, linewidth=1.0)
+# plt.title("Mean returns - Q-table")
+# plt.xlabel("Episode number")
+# plt.savefig("mean_returns.png")
+# # plt.show()
 
