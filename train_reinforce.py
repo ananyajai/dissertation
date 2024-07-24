@@ -130,7 +130,7 @@ def train(total_eps: int, market_params: tuple, eval_freq: int, epsilon) -> Defa
                 stats[key].append(value)
 
         except Exception as e:
-            print(f"Error processing seller episode {episode}: {e}")
+            pass
 
         # Evaluate the policy at specified intervals
         if episode % eval_freq == 0:
