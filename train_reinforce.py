@@ -180,9 +180,9 @@ value_optim = Adam(value_net.parameters(), lr=1e-4, eps=1e-3)
 
 
 CONFIG = {
-    "total_eps": 1000,
-    "eval_freq": 100,
-    "eval_episodes": 100,
+    "total_eps": 100000,
+    "eval_freq": 5000,
+    "eval_episodes": 5000,
     "gamma": 1.0,
     "epsilon": 1.0,
 }
@@ -233,17 +233,17 @@ value_loss = training_stats['v_loss']
 plt.plot(value_loss, linewidth=1.0)
 plt.title("Value Loss - Training Data")
 plt.xlabel("Episode number")
-# plt.savefig("training_value_loss.png")
-# plt.close()
-plt.show()
+plt.savefig("training_value_loss.png")
+plt.close()
+# plt.show()
 
 x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps']+1, CONFIG['eval_freq'])
 plt.plot(x_ticks, value_loss_list, linewidth=1.0)
 plt.title("Value Loss - Testing Data")
 plt.xlabel("Episode number")
-# plt.savefig("testing_value_loss.png")
+plt.savefig("testing_value_loss.png")
 # plt.close()
-plt.show()
+# plt.show()
 
 plt.plot(x_ticks, eval_returns_list, linewidth=1.0)
 plt.title("Mean returns - REINFORCE")
