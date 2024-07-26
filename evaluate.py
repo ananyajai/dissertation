@@ -1,41 +1,78 @@
-import time
-import matplotlib.pyplot as plt
-import numpy as np
 import random
+import csv
+import numpy as np 
+import ast
+from tqdm import tqdm
+from BSE import market_session
+from matplotlib import pyplot as plt
+from collections import defaultdict
+from typing import List, Dict, DefaultDict, Tuple
+from q_table_data import load_q_table, dump_q_table
+from epsilon_scheduling import epsilon_decay
+from load_episode import load_episode_data
 
-def evaluate(env, agent, max_steps, eval_episodes):
-    """
-    Evaluate configuration on given environment when initialised with given Q-table
+import torch
+from torch import nn, Tensor
+from torch.optim import Adam
+import torch.nn.functional as F
 
-    :param env (gym.Env): environment to execute evaluation on
-    :param agent (Agent): agent to act in environment
-    :param max_steps (int): max number of steps per evaluation episode
-    :param eval_episodes (int): number of evaluation episodes
-    :param render (bool): flag whether evaluation runs should be rendered
-    :return (float, int): mean of returns received over episodes and number of negative
-        return evaluation, episodes
-    """
-    episodic_returns = []
-    for eps_num in range(eval_episodes):
-        obs, _ = env.reset()
-        episodic_return = 0
-        done = False
-        steps = 0
+action_size = 3
 
-        while not done and steps < max_steps:
-            act = agent.act(obs)
-            n_obs, reward, terminated, truncated, info = env.step(act)
-            done = terminated
+# def evaluate(episodes: int, market_params: tuple, value_net, file) -> float:
+#     total_return = 0.0
 
-            episodic_return += reward
-            steps += 1
+#     updated_market_params = list(market_params)    
+#     updated_market_params[3]['sellers'][1][2]['value_func'] = value_net
+#     updated_market_params[3]['sellers'][1][2]['epsilon'] = 1.0         # No exploring
 
-            obs = n_obs
+#     for _ in range(episodes):
+#         balance = 0.0
+#         market_session(*updated_market_params)
 
-        episodic_returns.append(episodic_return)
+#         # Read the episode file
+#         with open(file, 'r') as f:
+#             reader = csv.reader(f)
+#             next(reader)  # Skip the header
+#             for row in reader:
+#                 reward = float(row[2])
+#                 balance += reward
 
-    mean_return = np.mean(episodic_returns)
-    negative_returns = sum([ret < 0 for ret in episodic_returns])
+#     # Profit made by the RL agent at the end of the trading window
+#         total_return += balance
+#         mean_return = total_return / episodes
 
-    return mean_return, negative_returns
+#     return mean_return
 
+
+def evaluate(episodes: int, market_params: tuple, value_net, file='testing_data.csv') -> Tuple[float, float]:
+    total_return = 0.0
+    obs_list, action_list, reward_list = load_episode_data(file)
+
+    # Compute the return using the value_net
+    returns = []
+    with torch.no_grad():  # No gradient calculation needed during evaluation
+        for obs, action, reward in zip(obs_list, action_list, reward_list):
+            # Flatten observation and create one-hot encoding for action
+            flattened_obs = obs.flatten()
+            one_hot_action = np.eye(action_size, dtype=int)[int(action)]
+            
+            # Concatenate flattened observation with one-hot action
+            state_action_pair = np.concatenate((flattened_obs, one_hot_action))
+            
+            # Convert state-action pair to a tensor
+            obs_tensor = torch.tensor(state_action_pair, dtype=torch.float32).unsqueeze(0)
+
+            value = value_net(obs_tensor).item()
+            returns.append(value)
+            total_return += reward
+
+    # Calculate mean return
+    mean_return = total_return / len(reward_list)
+    
+    # Calculate value loss (MSE)
+    returns_tensor = torch.tensor(returns, dtype=torch.float32)
+    rewards_tensor = torch.tensor(reward_list, dtype=torch.float32)
+    value_loss = F.mse_loss(returns_tensor, rewards_tensor)
+    total_value_loss = value_loss.item()
+
+    return mean_return, total_value_loss

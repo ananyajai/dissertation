@@ -72,7 +72,7 @@ from neural_network import Network
 
 # a bunch of system constants (globals)
 bse_sys_minprice = 1                    # minimum price in the system, in cents/pennies
-bse_sys_maxprice = 9                    # maximum price in the system, in cents/pennies
+bse_sys_maxprice = 200                    # maximum price in the system, in cents/pennies
 # ticksize should be a param of an exchange (so different exchanges have different ticksizes)
 ticksize = 1  # minimum change in price, in cents/pennies
 

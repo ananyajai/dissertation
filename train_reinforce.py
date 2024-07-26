@@ -9,6 +9,8 @@ from collections import defaultdict
 from typing import List, Dict, DefaultDict, Tuple
 from q_table_data import load_q_table, dump_q_table
 from epsilon_scheduling import epsilon_decay
+from evaluate import evaluate
+from load_episode import load_episode_data
 
 import torch
 from torch import nn, Tensor
@@ -20,27 +22,34 @@ from neural_network import Network
 gamma = 1.0
 
 
-def load_episode_data(file: str) -> Tuple[List[np.ndarray], List[float], List[float]]:
-    obs_list, action_list, reward_list = [], [], []
+def generate_testing_data(eval_eps: int, market_params: tuple, file: str):
+    """
+    Generates testing data by running market session eval_eps 
+    times and saving the trajectory data to a csv file.
 
-    with open(file, 'r') as f:
-        reader = csv.reader(f)
-        next(reader)  # Skip the header
-        for row in reader:
-            obs_str = row[0].strip()
-            obs_str = obs_str.replace('"', '')  # Remove quotes
-            obs_str = obs_str.replace('[', '').replace(']', '')  # Remove brackets
+    Args:
+        eval_eps (int): Total number of times to run market session.
+        market_params (tuple): Parameters for running market session.
+        file (str): File path where the trajectory from each market session is stored.
+    """
+    test_obs = []
+    test_actions = []
+    test_rewards = []
 
-            # Convert the string to a numpy array and reshape
-            obs_array = np.fromstring(obs_str, sep=' ').reshape((2, 10, 2))
+    for _ in range(eval_eps):
+        market_session(*market_params)
+        obs_list, action_list, reward_list = load_episode_data(file)
+        test_obs.extend(obs_list)
+        test_actions.extend(action_list)
+        test_rewards.extend(reward_list)
+    
+    with open('testing_data.csv', 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['Observations', 'Actions', 'Rewards'])
+        for obs, action, reward in zip(test_obs, test_actions, test_rewards):
+            writer.writerow([obs, action, reward])
 
-            obs_list.append(obs_array)
-
-            # Convert the Action and Reward to floats
-            action_list.append(float(row[1]))
-            reward_list.append(float(row[2]))
-
-    return obs_list, action_list, reward_list
+    print("Testing data has been generated")
 
 
 def q_value_function(state, action):
@@ -110,9 +119,12 @@ def update(
 
 
 def train(total_eps: int, market_params: tuple, eval_freq: int, epsilon) -> DefaultDict:
+    generate_testing_data(CONFIG['eval_episodes'], market_params, 'episode_seller.csv')
+
     # Dictionary to store training statistics
     stats = defaultdict(list)
     mean_return_list = []
+    value_loss_list = []
 
     for episode in range(1, total_eps + 1):
         # Run a market session to generate the episode data
@@ -132,45 +144,27 @@ def train(total_eps: int, market_params: tuple, eval_freq: int, epsilon) -> Defa
         except Exception as e:
             pass
 
-        market_params[3]['sellers'][1][2]['value_func'] = value_net
+        # market_params[3]['sellers'][1][2]['value_func'] = value_net
 
         # Evaluate the policy at specified intervals
         if episode % eval_freq == 0:
-            print(f"Episode {episode}: {update_results}")
+            # print(f"Episode {episode}: {update_results}")
             
-            mean_return_seller = evaluate(
-                episodes=CONFIG['eval_episodes'], market_params=market_params, 
-                value_net=value_net, file='episode_seller.csv')
-            tqdm.write(f"EVALUATION: EP {episode} - MEAN RETURN SELLER {mean_return_seller}")
+            # mean_return_seller = evaluate(
+            #     episodes=CONFIG['eval_episodes'], market_params=market_params, 
+            #     value_net=value_net, file='episode_seller.csv')
+            # tqdm.write(f"EVALUATION: EP {episode} - MEAN RETURN SELLER {mean_return_seller}")
+            # mean_return_list.append(mean_return_seller)
+
+            mean_return_seller, value_loss = evaluate(
+                episodes=CONFIG['eval_episodes'], market_params=market_params, value_net=value_net
+                )
+            tqdm.write(f"EVALUATION: EP {episode} - MEAN RETURN SELLER {mean_return_seller}, VALUE LOSS {value_loss}")
             mean_return_list.append(mean_return_seller)
+            value_loss_list.append(value_loss)
 
-    return stats, mean_return_list
+    return stats, mean_return_list, value_loss_list
 
-
-def evaluate(episodes: int, market_params: tuple, value_net, file) -> float:
-    total_return = 0.0
-
-    updated_market_params = list(market_params)    
-    updated_market_params[3]['sellers'][1][2]['value_func'] = value_net
-    updated_market_params[3]['sellers'][1][2]['epsilon'] = 0.0         # No exploring
-
-    for _ in range(episodes):
-        balance = 0.0
-        market_session(*updated_market_params)
-
-        # Read the episode file
-        with open(file, 'r') as f:
-            reader = csv.reader(f)
-            next(reader)  # Skip the header
-            for row in reader:
-                reward = float(row[2])
-                balance += reward
-
-        # Profit made by the RL agent at the end of the trading window
-        total_return += balance
-        mean_return = total_return / episodes
-
-    return mean_return
      
 
 state_size = 40
@@ -186,9 +180,9 @@ value_optim = Adam(value_net.parameters(), lr=1e-4, eps=1e-3)
 
 
 CONFIG = {
-    "total_eps": 100,
-    "eval_freq": 10,
-    "eval_episodes": 10,
+    "total_eps": 1000,
+    "eval_freq": 100,
+    "eval_episodes": 100,
     "gamma": 1.0,
     "epsilon": 1.0,
 }
@@ -219,11 +213,12 @@ dump_flags = {'dump_strats': False, 'dump_lobs': False, 'dump_avgbals': False, '
 verbose = False
 
 # Train the agent
-training_stats, eval_returns_list = train(CONFIG['total_eps'],
-                                    market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
-                                    eval_freq=CONFIG['eval_freq'],
-                                    epsilon=CONFIG['epsilon']
-                                    )
+training_stats, eval_returns_list, value_loss_list = train(
+    CONFIG['total_eps'],
+    market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
+    eval_freq=CONFIG['eval_freq'],
+    epsilon=CONFIG['epsilon']
+    )
 
 
 policy_loss = training_stats['p_loss']
@@ -236,13 +231,20 @@ plt.xlabel("Episode number")
 
 value_loss = training_stats['v_loss']
 plt.plot(value_loss, linewidth=1.0)
-plt.title("Value Loss vs Episode")
+plt.title("Value Loss - Training Data")
 plt.xlabel("Episode number")
-# plt.savefig("value_loss.png")
+# plt.savefig("training_value_loss.png")
 # plt.close()
 plt.show()
 
 x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps']+1, CONFIG['eval_freq'])
+plt.plot(x_ticks, value_loss_list, linewidth=1.0)
+plt.title("Value Loss - Testing Data")
+plt.xlabel("Episode number")
+# plt.savefig("testing_value_loss.png")
+# plt.close()
+plt.show()
+
 plt.plot(x_ticks, eval_returns_list, linewidth=1.0)
 plt.title("Mean returns - REINFORCE")
 plt.xlabel("Episode number")
