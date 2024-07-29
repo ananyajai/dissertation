@@ -2409,7 +2409,7 @@ def populate_market(traders_spec, traders, shuffle, verbose):
                            obs_space=spaces.MultiDiscrete([120, 100, 10, 10, 10, 10, 10, 10]))
         elif robottype == 'REINFORCE':
             return Reinforce('REINFORCE', name, balance, parameters, time0, 
-                           action_space=spaces.Discrete(3), learning_rate=1e-3,
+                           action_space=spaces.Discrete(21), learning_rate=1e-3,
                            obs_space=spaces.Box(low=0, high=np.inf, shape=(2, 10, 2), dtype=np.float32))
         else:
             sys.exit('FATAL: don\'t know robot type %s\n' % robottype)

@@ -181,21 +181,21 @@ def train(total_eps: int, market_params: tuple, eval_freq: int, epsilon, batch_s
      
 
 state_size = 40
-action_size = 3
+action_size = 21
 # policy_net = Network(
 #     dims=(40, 32, 21), output_activation=nn.Softmax(dim=-1)
 #     )
 
-value_net = Network(dims=(state_size+action_size, 32, 1), output_activation=None)
+value_net = Network(dims=(state_size+action_size, 32, 32, 1), output_activation=None)
 
 # policy_optim = Adam(policy_net.parameters(), lr=1e-4, eps=1e-3)
 value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
 
 CONFIG = {
-    "total_eps": 200000,
-    "eval_freq": 2000,
-    "eval_episodes": 5000,
+    "total_eps": 100000,
+    "eval_freq": 1000,
+    "eval_episodes": 1000,
     "gamma": 1.0,
     "epsilon": 1.0,
 }

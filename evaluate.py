@@ -16,14 +16,14 @@ from torch import nn, Tensor
 from torch.optim import Adam
 import torch.nn.functional as F
 
-action_size = 3
+action_size = 21
 
 # def evaluate(episodes: int, market_params: tuple, value_net, file) -> float:
 #     total_return = 0.0
 
 #     updated_market_params = list(market_params)    
 #     updated_market_params[3]['sellers'][1][2]['value_func'] = value_net
-#     updated_market_params[3]['sellers'][1][2]['epsilon'] = 1.0         # No exploring
+#     updated_market_params[3]['sellers'][1][2]['epsilon'] = 0.0         # No exploring
 
 #     for _ in range(episodes):
 #         balance = 0.0
