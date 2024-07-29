@@ -39,9 +39,11 @@ def generate_testing_data(eval_eps: int, market_params: tuple, file: str):
     for _ in range(eval_eps):
         market_session(*market_params)
         obs_list, action_list, reward_list = load_episode_data(file)
-        test_obs.extend(obs_list)
-        test_actions.extend(action_list)
-        test_rewards.extend(reward_list)
+        for obs, action, reward in zip(obs_list, action_list, reward_list):
+            if not np.all(obs == 0):  # Check if the observation is not a zero tensor
+                test_obs.append(obs)
+                test_actions.append(action)
+                test_rewards.append(reward)
     
     with open('testing_data.csv', 'w', newline='') as f:
         writer = csv.writer(f)
@@ -144,7 +146,7 @@ def train(total_eps: int, market_params: tuple, eval_freq: int, epsilon) -> Defa
         except Exception as e:
             pass
 
-        # market_params[3]['sellers'][1][2]['value_func'] = value_net
+        market_params[3]['sellers'][1][2]['value_func'] = value_net
 
         # Evaluate the policy at specified intervals
         if episode % eval_freq == 0:
@@ -173,16 +175,16 @@ action_size = 3
 #     dims=(40, 32, 21), output_activation=nn.Softmax(dim=-1)
 #     )
 
-value_net = Network(dims=(state_size+action_size, 32, 32, 1), output_activation=None)
+value_net = Network(dims=(state_size+action_size, 64, 32, 1), output_activation=None)
 
 # policy_optim = Adam(policy_net.parameters(), lr=1e-4, eps=1e-3)
-value_optim = Adam(value_net.parameters(), lr=1e-4, eps=1e-3)
+value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
 
 CONFIG = {
-    "total_eps": 500000,
-    "eval_freq": 5000,
-    "eval_episodes": 5000,
+    "total_eps": 300000,
+    "eval_freq": 3000,
+    "eval_episodes": 1000,
     "gamma": 1.0,
     "epsilon": 1.0,
 }
@@ -229,24 +231,24 @@ plt.xlabel("Episode number")
 # plt.close()
 # plt.show()
 
-value_loss = training_stats['v_loss']
-plt.plot(value_loss, linewidth=1.0)
-plt.title("Value Loss - Training Data")
-plt.xlabel("Episode number")
-plt.savefig("training_value_loss.png")
-plt.close()
-# plt.show()
-
-x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps']+1, CONFIG['eval_freq'])
-plt.plot(x_ticks, value_loss_list, linewidth=1.0)
-plt.title("Value Loss - Testing Data")
-plt.xlabel("Episode number")
-plt.savefig("testing_value_loss.png")
+# value_loss = training_stats['v_loss']
+# plt.plot(value_loss, linewidth=1.0)
+# plt.title("Value Loss - Training Data")
+# plt.xlabel("Episode number")
+# plt.savefig("training_value_loss.png")
 # plt.close()
 # plt.show()
 
-plt.plot(x_ticks, eval_returns_list, linewidth=1.0)
-plt.title("Mean returns - REINFORCE")
-plt.xlabel("Episode number")
+# x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps']+1, CONFIG['eval_freq'])
+# plt.plot(x_ticks, value_loss_list, linewidth=1.0)
+# plt.title("Value Loss - Testing Data")
+# plt.xlabel("Episode number")
+# plt.savefig("testing_value_loss.png")
+# plt.close()
+# plt.show()
+
+# plt.plot(x_ticks, eval_returns_list, linewidth=1.0)
+# plt.title("Mean returns - REINFORCE")
+# plt.xlabel("Episode number")
 # plt.savefig("mean_returns.png")
 # plt.show()
