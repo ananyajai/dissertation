@@ -129,8 +129,17 @@ def train(total_eps: int, market_params: tuple, eval_freq: int, epsilon, batch_s
     value_loss_list = []
 
     for episode in range(1, total_eps + 1):
-        # Run a market session to generate the episode data
-        market_session(*market_params)
+        # # Run a market session to generate the episode data
+        # market_session(*market_params)
+
+        # Update market_params to include the current epsilon
+        updated_market_params = list(market_params)
+        updated_market_params[3]['sellers'][1][2]['epsilon'] = epsilon
+        
+        # Epsilon scheduling
+        epsilon = epsilon_decay('linear', episode, total_eps)
+        # # Run one market session to get observations, actions, and rewards
+        market_session(*updated_market_params)
 
         try:
             file = 'episode_seller.csv'
@@ -246,17 +255,17 @@ value_loss = training_stats['v_loss']
 plt.plot(value_loss, linewidth=1.0)
 plt.title("Value Loss - Training Data")
 plt.xlabel("Episode number")
-# plt.savefig("training_value_loss.png")
-# plt.close()
-plt.show()
+plt.savefig("training_value_loss.png")
+plt.close()
+# plt.show()
 
 x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps']+1, CONFIG['eval_freq'])
 plt.plot(x_ticks, value_loss_list, linewidth=1.0)
 plt.title("Value Loss - Testing Data")
 plt.xlabel("Episode number")
-# plt.savefig("testing_value_loss.png")
+plt.savefig("testing_value_loss.png")
 # plt.close()
-plt.show()
+# plt.show()
 
 # plt.plot(x_ticks, eval_returns_list, linewidth=1.0)
 # plt.title("Mean returns - REINFORCE")
