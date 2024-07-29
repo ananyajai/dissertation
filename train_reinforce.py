@@ -120,7 +120,7 @@ def update(
         return {"v_loss": float(v_loss)}
 
 
-def train(total_eps: int, market_params: tuple, eval_freq: int, epsilon) -> DefaultDict:
+def train(total_eps: int, market_params: tuple, eval_freq: int, epsilon, batch_size: int=32) -> DefaultDict:
     generate_testing_data(CONFIG['eval_episodes'], market_params, 'episode_seller.csv')
 
     # Dictionary to store training statistics
@@ -136,12 +136,23 @@ def train(total_eps: int, market_params: tuple, eval_freq: int, epsilon) -> Defa
             file = 'episode_seller.csv'
             obs_list, action_list, reward_list = load_episode_data(file)
 
-            # Run the REINFORCE algorithm
-            update_results = update(obs_list, action_list, reward_list)
+            # Process data in batches
+            for i in range(0, len(obs_list), batch_size):
+                obs_batch = obs_list[i:i + batch_size]
+                action_batch = action_list[i:i + batch_size]
+                reward_batch = reward_list[i:i + batch_size]
+
+                update_results = update(obs_batch, action_batch, reward_batch)
+
+                for key, value in update_results.items():
+                    stats[key].append(value)
+
+            # # Run the REINFORCE algorithm
+            # update_results = update(obs_list, action_list, reward_list)
             
-            # Store the update results
-            for key, value in update_results.items():
-                stats[key].append(value)
+            # # Store the update results
+            # for key, value in update_results.items():
+            #     stats[key].append(value)
 
         except Exception as e:
             pass
@@ -175,16 +186,16 @@ action_size = 3
 #     dims=(40, 32, 21), output_activation=nn.Softmax(dim=-1)
 #     )
 
-value_net = Network(dims=(state_size+action_size, 64, 32, 1), output_activation=None)
+value_net = Network(dims=(state_size+action_size, 32, 1), output_activation=None)
 
 # policy_optim = Adam(policy_net.parameters(), lr=1e-4, eps=1e-3)
 value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
 
 CONFIG = {
-    "total_eps": 300000,
-    "eval_freq": 3000,
-    "eval_episodes": 1000,
+    "total_eps": 200000,
+    "eval_freq": 2000,
+    "eval_episodes": 5000,
     "gamma": 1.0,
     "epsilon": 1.0,
 }
@@ -231,21 +242,21 @@ plt.xlabel("Episode number")
 # plt.close()
 # plt.show()
 
-# value_loss = training_stats['v_loss']
-# plt.plot(value_loss, linewidth=1.0)
-# plt.title("Value Loss - Training Data")
-# plt.xlabel("Episode number")
+value_loss = training_stats['v_loss']
+plt.plot(value_loss, linewidth=1.0)
+plt.title("Value Loss - Training Data")
+plt.xlabel("Episode number")
 # plt.savefig("training_value_loss.png")
 # plt.close()
-# plt.show()
+plt.show()
 
-# x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps']+1, CONFIG['eval_freq'])
-# plt.plot(x_ticks, value_loss_list, linewidth=1.0)
-# plt.title("Value Loss - Testing Data")
-# plt.xlabel("Episode number")
+x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps']+1, CONFIG['eval_freq'])
+plt.plot(x_ticks, value_loss_list, linewidth=1.0)
+plt.title("Value Loss - Testing Data")
+plt.xlabel("Episode number")
 # plt.savefig("testing_value_loss.png")
 # plt.close()
-# plt.show()
+plt.show()
 
 # plt.plot(x_ticks, eval_returns_list, linewidth=1.0)
 # plt.title("Mean returns - REINFORCE")
