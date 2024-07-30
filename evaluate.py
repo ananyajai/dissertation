@@ -16,7 +16,7 @@ from torch import nn, Tensor
 from torch.optim import Adam
 import torch.nn.functional as F
 
-action_size = 21
+action_size = 3
 
 # def evaluate(episodes: int, market_params: tuple, value_net, file) -> float:
 #     total_return = 0.0

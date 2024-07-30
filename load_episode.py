@@ -27,6 +27,7 @@ def load_episode_data(file: str) -> Tuple[List[np.ndarray], List[float], List[fl
             # Convert the string to a numpy array and reshape
             obs_array = np.fromstring(obs_str, sep=' ').reshape((2, 10, 2))
 
+            # Normalise the observations
             obs_list.append(normalise_lob(obs_array))
 
             # Convert the Action and Reward to floats

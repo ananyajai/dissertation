@@ -129,17 +129,17 @@ def train(total_eps: int, market_params: tuple, eval_freq: int, epsilon, batch_s
     value_loss_list = []
 
     for episode in range(1, total_eps + 1):
-        # # Run a market session to generate the episode data
-        # market_session(*market_params)
+        # Run a market session to generate the episode data
+        market_session(*market_params)
 
-        # Update market_params to include the current epsilon
-        updated_market_params = list(market_params)
-        updated_market_params[3]['sellers'][1][2]['epsilon'] = epsilon
+        # # Update market_params to include the current epsilon
+        # updated_market_params = list(market_params)
+        # updated_market_params[3]['sellers'][1][2]['epsilon'] = epsilon
         
-        # Epsilon scheduling
-        epsilon = epsilon_decay('linear', episode, total_eps)
-        # # Run one market session to get observations, actions, and rewards
-        market_session(*updated_market_params)
+        # # Epsilon scheduling
+        # epsilon = epsilon_decay('linear', episode, total_eps)
+        # # # Run one market session to get observations, actions, and rewards
+        # market_session(*updated_market_params)
 
         try:
             file = 'episode_seller.csv'
@@ -166,7 +166,7 @@ def train(total_eps: int, market_params: tuple, eval_freq: int, epsilon, batch_s
         except Exception as e:
             pass
 
-        market_params[3]['sellers'][1][2]['value_func'] = value_net
+        # market_params[3]['sellers'][1][2]['value_func'] = value_net
 
         # Evaluate the policy at specified intervals
         if episode % eval_freq == 0:
@@ -190,7 +190,7 @@ def train(total_eps: int, market_params: tuple, eval_freq: int, epsilon, batch_s
      
 
 state_size = 40
-action_size = 21
+action_size = 3
 # policy_net = Network(
 #     dims=(40, 32, 21), output_activation=nn.Softmax(dim=-1)
 #     )
