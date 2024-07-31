@@ -1,4 +1,5 @@
 import random
+from send2trash import send2trash
 import csv
 import numpy as np 
 import ast
@@ -11,19 +12,21 @@ from q_table_data import load_q_table, dump_q_table
 from epsilon_scheduling import epsilon_decay
 from evaluate import evaluate
 from load_episode import load_episode_data
+from early_stopping import EarlyStopping
 
+from neural_network import Network
 import torch
 from torch import nn, Tensor
 from torch.optim import Adam
 import torch.nn.functional as F
 
-from neural_network import Network
-
 
 CONFIG = {
-    "total_eps": 30000,
-    "eval_freq": 300,
-    "eval_episodes": 1000,
+    "total_eps": 100,
+    "eval_freq": 10,
+    "train_data_eps": 10,
+    "eval_data_eps": 10,
+    "val_data_eps": 10,
     "gamma": 1.0,
     "epsilon": 1.0,
     "batch_size": 32
@@ -74,6 +77,11 @@ def generate_data(total_eps: int, market_params: tuple, eps_file: str, output_fi
     obs = []
     actions = []
     rewards = []
+
+    try:
+        send2trash([eps_file, output_file])
+    except:
+        pass
 
     for _ in range(total_eps):
         market_session(*market_params)
@@ -143,9 +151,11 @@ def train(total_eps: int, eval_freq: int, market_params: tuple, batch_size: int=
     # Dictionary to store training statistics
     stats = defaultdict(list)
     mean_return_list = []
-    value_loss_list = []
+    valid_loss_list = []
+    test_loss_list = []
 
     obs_list, action_list, reward_list = load_episode_data('training_data.csv')
+    # val_obs_list, val_action_list, val_reward_list = load_episode_data('validation_data.csv')
 
     for episode in range(1, total_eps + 1):
         ep_value_loss = []
@@ -171,34 +181,52 @@ def train(total_eps: int, eval_freq: int, market_params: tuple, batch_size: int=
 
         # Evaluate the policy at specified intervals
         if episode % eval_freq == 0:
+            val_mean_return, val_value_loss = evaluate(
+                market_params=market_params, value_net=value_net, file='validation_data.csv'
+            )
+            print(f"VALIDATION: EP {episode} - MEAN RETURN {val_mean_return}, VALUE LOSS {val_value_loss}")
+            valid_loss_list.append(val_value_loss)
+
+            early_stop = EarlyStopping()
+            if early_stop.should_stop(val_value_loss, value_net):
+                print(f"Early stopping at episode {episode} with validation loss {val_value_loss}")
+                break
 
             mean_return_seller, value_loss = evaluate(
-                episodes=CONFIG['eval_episodes'], market_params=market_params, value_net=value_net
-                )
-            tqdm.write(f"EVALUATION: EP {episode} - MEAN RETURN SELLER {mean_return_seller}, VALUE LOSS {value_loss}")
+                market_params=market_params, value_net=value_net, file='testing_data.csv'
+            )
+            tqdm.write(f"TESTING: EP {episode} - MEAN RETURN {mean_return_seller}, VALUE LOSS {value_loss}")
             mean_return_list.append(mean_return_seller)
-            value_loss_list.append(value_loss)
+            test_loss_list.append(value_loss)
 
-    return stats, mean_return_list, value_loss_list
+            
+    return stats, mean_return_list, valid_loss_list, test_loss_list
 
 
 # Generate training data
-generate_data(CONFIG['total_eps'], 
+generate_data(CONFIG['train_data_eps'], 
               market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
               eps_file='episode_seller.csv', 
               output_file='training_data.csv'
               )
 
+# Generate validation data
+generate_data(CONFIG['val_data_eps'], 
+              market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
+              eps_file='episode_seller.csv', 
+              output_file='validation_data.csv'
+              )
+
 # Generate testing data
-generate_data(CONFIG['eval_episodes'], 
+generate_data(CONFIG['eval_data_eps'], 
               market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
               eps_file='episode_seller.csv', 
               output_file='testing_data.csv'
               )
 
 # Start training
-stats, mean_return_list, value_loss_list = train(
-    total_eps=CONFIG["total_eps"],
+stats, mean_return_list, valid_loss_list, test_loss_list = train(
+    total_eps=CONFIG['total_eps'],
     eval_freq=CONFIG["eval_freq"],
     market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose),
     batch_size=CONFIG["batch_size"]
@@ -208,14 +236,21 @@ value_loss = stats['v_loss']
 plt.plot(value_loss, linewidth=1.0)
 plt.title("Value Loss - Training Data")
 plt.xlabel("Episode number")
-plt.savefig("training_value_loss.png")
-plt.close()
-# plt.show()
+# plt.savefig("training_value_loss.png")
+# plt.close()
+plt.show()
 
 x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps']+1, CONFIG['eval_freq'])
-plt.plot(x_ticks, value_loss_list, linewidth=1.0)
+plt.plot(x_ticks, test_loss_list, linewidth=1.0)
 plt.title("Value Loss - Testing Data")
 plt.xlabel("Episode number")
-plt.savefig("testing_value_loss.png")
-plt.close()
-# plt.show()
+# plt.savefig("testing_value_loss.png")
+# plt.close()
+plt.show()
+
+plt.plot(x_ticks, valid_loss_list, linewidth=1.0)
+plt.title("Value Loss - Validation Data")
+plt.xlabel("Episode number")
+# plt.savefig("testing_value_loss.png")
+# plt.close()
+plt.show()

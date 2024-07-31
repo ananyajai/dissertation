@@ -1,50 +1,18 @@
-import random
-import csv
 import numpy as np 
-import ast
 from tqdm import tqdm
 from BSE import market_session
 from matplotlib import pyplot as plt
-from collections import defaultdict
 from typing import List, Dict, DefaultDict, Tuple
-from q_table_data import load_q_table, dump_q_table
 from epsilon_scheduling import epsilon_decay
 from load_episode import load_episode_data
 
 import torch
-from torch import nn, Tensor
-from torch.optim import Adam
 import torch.nn.functional as F
 
 action_size = 3
 
-# def evaluate(episodes: int, market_params: tuple, value_net, file) -> float:
-#     total_return = 0.0
 
-#     updated_market_params = list(market_params)    
-#     updated_market_params[3]['sellers'][1][2]['value_func'] = value_net
-#     updated_market_params[3]['sellers'][1][2]['epsilon'] = 0.0         # No exploring
-
-#     for _ in range(episodes):
-#         balance = 0.0
-#         market_session(*updated_market_params)
-
-#         # Read the episode file
-#         with open(file, 'r') as f:
-#             reader = csv.reader(f)
-#             next(reader)  # Skip the header
-#             for row in reader:
-#                 reward = float(row[2])
-#                 balance += reward
-
-#     # Profit made by the RL agent at the end of the trading window
-#         total_return += balance
-#         mean_return = total_return / episodes
-
-#     return mean_return
-
-
-def evaluate(episodes: int, market_params: tuple, value_net, file='testing_data.csv') -> Tuple[float, float]:
+def evaluate(market_params: tuple, value_net, file='testing_data.csv') -> Tuple[float, float]:
     total_return = 0.0
     obs_list, action_list, reward_list = load_episode_data(file)
 
@@ -76,3 +44,29 @@ def evaluate(episodes: int, market_params: tuple, value_net, file='testing_data.
     total_value_loss = value_loss.item()
 
     return mean_return, total_value_loss
+
+
+# def evaluate(episodes: int, market_params: tuple, value_net, file) -> float:
+#     total_return = 0.0
+
+#     updated_market_params = list(market_params)    
+#     updated_market_params[3]['sellers'][1][2]['value_func'] = value_net
+#     updated_market_params[3]['sellers'][1][2]['epsilon'] = 0.0         # No exploring
+
+#     for _ in range(episodes):
+#         balance = 0.0
+#         market_session(*updated_market_params)
+
+#         # Read the episode file
+#         with open(file, 'r') as f:
+#             reader = csv.reader(f)
+#             next(reader)  # Skip the header
+#             for row in reader:
+#                 reward = float(row[2])
+#                 balance += reward
+
+#     # Profit made by the RL agent at the end of the trading window
+#         total_return += balance
+#         mean_return = total_return / episodes
+
+#     return mean_return
