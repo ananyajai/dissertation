@@ -22,11 +22,11 @@ import torch.nn.functional as F
 
 
 CONFIG = {
-    "total_eps": 100,
-    "eval_freq": 10,
-    "train_data_eps": 10,
-    "eval_data_eps": 10,
-    "val_data_eps": 10,
+    "total_eps": 1000,
+    "eval_freq": 100,
+    "train_data_eps": 700,
+    "eval_data_eps": 100,
+    "val_data_eps": 100,
     "gamma": 1.0,
     "epsilon": 1.0,
     "batch_size": 32
@@ -35,8 +35,13 @@ CONFIG = {
 # Define the value function neural network
 state_size = 40
 action_size = 3
-value_net = Network(dims=(state_size+action_size, 32, 1), output_activation=None)
+value_net = Network(dims=(state_size+action_size, 32, 32, 1), output_activation=None)
 value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
+
+# policy_net = Network(
+#     dims=(40, 32, 21), output_activation=nn.Softmax(dim=-1)
+#     )
+# policy_optim = Adam(policy_net.parameters(), lr=1e-4, eps=1e-3)
 
 # Define market parameters
 sess_id = 'session_1'
@@ -106,6 +111,7 @@ def update(
         ) -> Dict[str, float]:
         # Initialise loss and returns
         v_loss = 0
+        p_loss = 0
         G = 0
         traj_length = len(observations)
 
@@ -146,7 +152,6 @@ def update(
         return {"v_loss": float(v_loss)}
 
 
-
 def train(total_eps: int, eval_freq: int, market_params: tuple, batch_size: int=32) -> DefaultDict:
     # Dictionary to store training statistics
     stats = defaultdict(list)
@@ -155,7 +160,6 @@ def train(total_eps: int, eval_freq: int, market_params: tuple, batch_size: int=
     test_loss_list = []
 
     obs_list, action_list, reward_list = load_episode_data('training_data.csv')
-    # val_obs_list, val_action_list, val_reward_list = load_episode_data('validation_data.csv')
 
     for episode in range(1, total_eps + 1):
         ep_value_loss = []
@@ -241,16 +245,18 @@ plt.xlabel("Episode number")
 plt.show()
 
 x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps']+1, CONFIG['eval_freq'])
-plt.plot(x_ticks, test_loss_list, linewidth=1.0)
-plt.title("Value Loss - Testing Data")
+plt.plot(x_ticks, test_loss_list, 'c')
+plt.plot(x_ticks, valid_loss_list, 'g')
+plt.title("Value Loss")
+plt.legend()
 plt.xlabel("Episode number")
 # plt.savefig("testing_value_loss.png")
 # plt.close()
 plt.show()
 
-plt.plot(x_ticks, valid_loss_list, linewidth=1.0)
-plt.title("Value Loss - Validation Data")
-plt.xlabel("Episode number")
-# plt.savefig("testing_value_loss.png")
-# plt.close()
-plt.show()
+# plt.plot(x_ticks, valid_loss_list, linewidth=1.0)
+# plt.title("Value Loss - Validation Data")
+# plt.xlabel("Episode number")
+# # plt.savefig("testing_value_loss.png")
+# # plt.close()
+# plt.show()
