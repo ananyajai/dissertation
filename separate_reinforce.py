@@ -107,7 +107,7 @@ def generate_data(total_eps: int, market_params: tuple, eps_file: str, output_fi
 
 
 def update(
-        observations: List[np.ndarray], actions: List[int], rewards: List[float],
+        observations: List[np.ndarray], actions: List[int], rewards: List[float], gamma: float
         ) -> Dict[str, float]:
         # Initialise loss and returns
         v_loss = 0
@@ -138,7 +138,7 @@ def update(
         G = [ 0 for n in range(traj_length) ]
         G[-1] = normalised_rewards[-1]
         for t in range(traj_length - 2, -1, -1):
-            G[t] = normalised_rewards[t] + CONFIG['gamma'] * G[t + 1]
+            G[t] = normalised_rewards[t] + gamma * G[t + 1]
 
         G = torch.tensor(G, dtype=torch.float32)
         v_loss = F.mse_loss(baseline_values, G)
@@ -152,7 +152,7 @@ def update(
         return {"v_loss": float(v_loss)}
 
 
-def train(total_eps: int, eval_freq: int, market_params: tuple, batch_size: int=32) -> DefaultDict:
+def train(total_eps: int, eval_freq: int, market_params: tuple, gamma: float, batch_size: int=32) -> DefaultDict:
     # Dictionary to store training statistics
     stats = defaultdict(list)
     mean_return_list = []
@@ -171,7 +171,7 @@ def train(total_eps: int, eval_freq: int, market_params: tuple, batch_size: int=
                 action_batch = action_list[i:i + batch_size]
                 reward_batch = reward_list[i:i + batch_size]
 
-                update_results = update(obs_batch, action_batch, reward_batch)
+                update_results = update(obs_batch, action_batch, reward_batch, gamma=gamma)
 
                 for key, value in update_results.items():
                     ep_value_loss.append(value)
@@ -228,35 +228,39 @@ generate_data(CONFIG['eval_data_eps'],
               output_file='testing_data.csv'
               )
 
+gamma_list = np.linspace(0, 1, 11)
+
 # Start training
-stats, mean_return_list, valid_loss_list, test_loss_list = train(
-    total_eps=CONFIG['total_eps'],
-    eval_freq=CONFIG["eval_freq"],
-    market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose),
-    batch_size=CONFIG["batch_size"]
-)
+for gamma in gamma_list:
+    stats, mean_return_list, valid_loss_list, test_loss_list = train(
+        total_eps=CONFIG['total_eps'],
+        eval_freq=CONFIG["eval_freq"],
+        market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose),
+        gamma=gamma,
+        batch_size=CONFIG["batch_size"]
+    )
 
-value_loss = stats['v_loss']
-plt.plot(value_loss, linewidth=1.0)
-plt.title("Value Loss - Training Data")
-plt.xlabel("Episode number")
-# plt.savefig("training_value_loss.png")
-# plt.close()
-plt.show()
+    value_loss = stats['v_loss']
+    plt.plot(value_loss, linewidth=1.0)
+    plt.title(f"Value Loss - Training Data, gamma = {gamma}")
+    plt.xlabel("Episode number")
+    plt.savefig(f"training_loss_g{gamma}.png")
+    plt.close()
+    # plt.show()
 
-x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps']+1, CONFIG['eval_freq'])
-plt.plot(x_ticks, test_loss_list, 'c')
-plt.plot(x_ticks, valid_loss_list, 'g')
-plt.title("Value Loss")
-plt.legend()
-plt.xlabel("Episode number")
-# plt.savefig("testing_value_loss.png")
-# plt.close()
-plt.show()
+    x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps']+1, CONFIG['eval_freq'])
+    plt.plot(x_ticks, test_loss_list, 'c')
+    # plt.plot(x_ticks, valid_loss_list, 'g')
+    plt.title(f"Value Loss - Testing Data, gamma = {gamma}")
+    # plt.legend(['Testing Loss', 'Validation Loss'])
+    plt.xlabel("Episode number")
+    plt.savefig("testing_loss_g{gamma}.png")
+    # plt.close()
+    # plt.show()
 
-# plt.plot(x_ticks, valid_loss_list, linewidth=1.0)
-# plt.title("Value Loss - Validation Data")
-# plt.xlabel("Episode number")
-# # plt.savefig("testing_value_loss.png")
-# # plt.close()
-# plt.show()
+    # plt.plot(x_ticks, valid_loss_list, linewidth=1.0)
+    # plt.title("Value Loss - Validation Data")
+    # plt.xlabel("Episode number")
+    # # plt.savefig("valid_value_loss.png")
+    # # plt.close()
+    # plt.show()
