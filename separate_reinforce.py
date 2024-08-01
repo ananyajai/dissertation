@@ -38,10 +38,6 @@ action_size = 3
 value_net = Network(dims=(state_size+action_size, 32, 32, 1), output_activation=None)
 value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
-# policy_net = Network(
-#     dims=(40, 32, 21), output_activation=nn.Softmax(dim=-1)
-#     )
-# policy_optim = Adam(policy_net.parameters(), lr=1e-4, eps=1e-3)
 
 # Define market parameters
 sess_id = 'session_1'
@@ -254,8 +250,8 @@ for gamma in gamma_list:
     plt.title(f"Value Loss - Testing Data, gamma = {gamma}")
     # plt.legend(['Testing Loss', 'Validation Loss'])
     plt.xlabel("Episode number")
-    plt.savefig("testing_loss_g{gamma}.png")
-    # plt.close()
+    plt.savefig(f"testing_loss_g{gamma}.png")
+    plt.close()
     # plt.show()
 
     # plt.plot(x_ticks, valid_loss_list, linewidth=1.0)
