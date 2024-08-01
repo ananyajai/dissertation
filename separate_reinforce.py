@@ -226,8 +226,59 @@ generate_data(CONFIG['eval_data_eps'],
 
 gamma_list = np.linspace(0, 1, 11)
 
+# # Start training
+# for gamma in gamma_list:
+#     stats, mean_return_list, valid_loss_list, test_loss_list = train(
+#         total_eps=CONFIG['total_eps'],
+#         eval_freq=CONFIG["eval_freq"],
+#         market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose),
+#         gamma=gamma,
+#         batch_size=CONFIG["batch_size"]
+#     )
+
+#     value_loss = stats['v_loss']
+#     plt.plot(value_loss, linewidth=1.0)
+#     plt.title(f"Value Loss - Training Data, gamma = {gamma}")
+#     plt.xlabel("Episode number")
+#     plt.savefig(f"training_loss_g{gamma}.png")
+#     plt.close()
+#     # plt.show()
+
+#     x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps']+1, CONFIG['eval_freq'])
+#     plt.plot(x_ticks, test_loss_list, 'c')
+#     # plt.plot(x_ticks, valid_loss_list, 'g')
+#     plt.title(f"Value Loss - Testing Data, gamma = {gamma}")
+#     # plt.legend(['Testing Loss', 'Validation Loss'])
+#     plt.xlabel("Episode number")
+#     plt.savefig(f"testing_loss_g{gamma}.png")
+#     plt.close()
+#     # plt.show()
+
+#     plt.plot(x_ticks, valid_loss_list, linewidth=1.0)
+#     plt.title(f"Value Loss - Validation Data, gamma = {gamma}")
+#     plt.xlabel("Episode number")
+#     plt.savefig(f"valid_loss_g{gamma}.png")
+#     plt.close()
+#     # plt.show()
+
+
+# Set up the subplot grid
+fig_training, axs_training = plt.subplots(3, 4, figsize=(20, 15))
+fig_testing, axs_testing = plt.subplots(3, 4, figsize=(20, 15))
+fig_validation, axs_validation = plt.subplots(3, 4, figsize=(20, 15))
+
+# Flatten the axes arrays for easy indexing
+axs_training = axs_training.flatten()
+axs_testing = axs_testing.flatten()
+axs_validation = axs_validation.flatten()
+
+# Remove the last subplot (12th) if not needed
+fig_training.delaxes(axs_training[-1])
+fig_testing.delaxes(axs_testing[-1])
+fig_validation.delaxes(axs_validation[-1])
+
 # Start training
-for gamma in gamma_list:
+for i, gamma in enumerate(gamma_list):
     stats, mean_return_list, valid_loss_list, test_loss_list = train(
         total_eps=CONFIG['total_eps'],
         eval_freq=CONFIG["eval_freq"],
@@ -237,26 +288,34 @@ for gamma in gamma_list:
     )
 
     value_loss = stats['v_loss']
-    plt.plot(value_loss, linewidth=1.0)
-    plt.title(f"Value Loss - Training Data, gamma = {gamma}")
-    plt.xlabel("Episode number")
-    plt.savefig(f"training_loss_g{gamma}.png")
-    plt.close()
-    # plt.show()
 
-    x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps']+1, CONFIG['eval_freq'])
-    plt.plot(x_ticks, test_loss_list, 'c')
-    # plt.plot(x_ticks, valid_loss_list, 'g')
-    plt.title(f"Value Loss - Testing Data, gamma = {gamma}")
-    # plt.legend(['Testing Loss', 'Validation Loss'])
-    plt.xlabel("Episode number")
-    plt.savefig(f"testing_loss_g{gamma}.png")
-    plt.close()
-    # plt.show()
+    # Plot training loss
+    axs_training[i].plot(value_loss, linewidth=1.0)
+    axs_training[i].set_title(f"Training Loss, γ={gamma:.1f}")
+    axs_training[i].set_xlabel("Episode")
+    axs_training[i].set_ylabel("Loss")
 
-    # plt.plot(x_ticks, valid_loss_list, linewidth=1.0)
-    # plt.title("Value Loss - Validation Data")
-    # plt.xlabel("Episode number")
-    # # plt.savefig("valid_value_loss.png")
-    # # plt.close()
-    # plt.show()
+    # Plot testing loss
+    x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps'] + 1, CONFIG['eval_freq'])
+    axs_testing[i].plot(x_ticks, test_loss_list, 'c')
+    axs_testing[i].set_title(f"Testing Loss, γ={gamma:.1f}")
+    axs_testing[i].set_xlabel("Episode")
+    axs_testing[i].set_ylabel("Loss")
+
+    # Plot validation loss
+    axs_validation[i].plot(x_ticks, valid_loss_list, 'g')
+    axs_validation[i].set_title(f"Validation Loss, γ={gamma:.1f}")
+    axs_validation[i].set_xlabel("Episode")
+    axs_validation[i].set_ylabel("Loss")
+
+# Adjust layout
+fig_training.tight_layout()
+fig_testing.tight_layout()
+fig_validation.tight_layout()
+
+# Save figures
+fig_training.savefig("training_loss_subplots.png")
+fig_testing.savefig("testing_loss_subplots.png")
+fig_validation.savefig("validation_loss_subplots.png")
+
+# plt.show()
