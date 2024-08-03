@@ -224,7 +224,6 @@ test_obs, test_actions, test_rewards = generate_data(CONFIG['eval_data_eps'],
               output_file='testing_data.csv'
               )
 
-
 stats, mean_return_list, valid_loss_list, test_loss_list = train(
         train_obs, train_actions, train_rewards,
         val_obs, val_actions, val_rewards,

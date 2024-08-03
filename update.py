@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from collections import defaultdict
 from typing import List, Dict, DefaultDict, Tuple
 
-action_size = 3
+action_size = 10
 
 def update(
         value_net, value_optim, observations: List[np.ndarray], 
