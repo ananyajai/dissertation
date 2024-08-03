@@ -76,15 +76,21 @@ bse_sys_maxprice = 200                    # maximum price in the system, in cent
 # ticksize should be a param of an exchange (so different exchanges have different ticksizes)
 ticksize = 1  # minimum change in price, in cents/pennies
 
-def calc_average_price(list):
-        # Calculate the total price contribution and total quantity
-        total_price = sum(price * quantity for price, quantity in list)
-        total_quantity = sum(quantity for price, quantity in list)
-        
-        # Calculate the weighted average price
-        weighted_average_price = total_price / total_quantity if total_quantity else 0
-        
-        return weighted_average_price   
+def calc_price_metrics(list):
+    if not list:
+        return 0, 0  # No prices and quantities available
+
+    # Calculate the total price contribution and total quantity
+    total_price = sum(price * quantity for price, quantity in list)
+    total_quantity = sum(quantity for price, quantity in list)
+    
+    # Calculate the weighted average price
+    weighted_average_price = total_price / total_quantity if total_quantity else 0
+
+    # Calculate variance
+    var_price = sum(quantity * (price - weighted_average_price) ** 2 for price, quantity in list) / total_quantity if total_quantity else 0
+    
+    return weighted_average_price, var_price 
 
 
 def bin_average(value, min_price=bse_sys_minprice, max_price=bse_sys_maxprice, bins=5):
@@ -137,6 +143,24 @@ def get_discrete_state(type, lob, time, order):
     
     return observation
 
+
+def get_state(type, lob, time, order):
+    n_buyers = lob['bids']['n']
+    n_sellers = lob['asks']['n']
+    best_bid = lob['bids']['best'] if lob['bids']['best'] else bse_sys_minprice
+    best_ask = lob['asks']['best'] if lob['asks']['best'] else bse_sys_maxprice
+    worst_bid = lob['bids']['worst'] if lob['bids']['worst'] else bse_sys_minprice
+    worst_ask = lob['asks']['worst'] if lob['asks']['worst'] else bse_sys_maxprice
+    avg_bid, var_bid = calc_price_metrics(lob['bids']['lob'])
+    avg_ask, var_ask = calc_price_metrics(lob['asks']['lob'])
+
+    observation = np.array([float(time), float(order), int(n_buyers), int(n_sellers),
+                            float(best_bid), float(best_ask), float(worst_bid), 
+                            float(worst_ask), float(avg_bid), float(avg_ask),
+                            float(var_bid), float(var_ask)])
+    # rounded_obs = np.around(observation, decimals=3)
+
+    return observation
 
 # an Order/quote has a trader id, a type (buy/sell) price, quantity, timestamp, and unique i.d.
 class Order:
@@ -2125,7 +2149,7 @@ class Reinforce(RLAgent):
     ):
         
         super().__init__(ttype, tid, balance, params, time, action_space, obs_space, gamma, epsilon)
-        self.state_size = np.prod(self.obs_space.shape)
+        self.state_size = 12
         self.action_size = self.action_space.n
         self.learning_rate = learning_rate
 
@@ -2197,7 +2221,8 @@ class Reinforce(RLAgent):
             order_type = self.orders[0].otype
 
             # Extract relevant features from the lob
-            obs = self.preprocess_lob(lob)
+            # obs = self.preprocess_lob(lob)
+            obs = tuple(get_state(self.type, lob, time, self.orders[0].price))
             state = torch.tensor(obs, dtype=torch.float32).flatten()
 
             # Use epsilon-greedy strategy for action selection
@@ -2981,7 +3006,7 @@ if __name__ == "__main__":
     demand_schedule = [{'from': start_time, 'to': end_time, 'ranges': [range2], 'stepmode': 'fixed'}]
 
     # new customer orders arrive at each trader approx once every order_interval seconds
-    order_interval = 30
+    order_interval = 15
 
     order_sched = {'sup': supply_schedule, 'dem': demand_schedule,
                    'interval': order_interval, 'timemode': 'drip-poisson'}
