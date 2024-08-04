@@ -20,9 +20,9 @@ import torch.nn.functional as F
 CONFIG = {
     "total_eps": 50,
     "eval_freq": 1,
-    "train_data_eps": 16,
-    "eval_data_eps": 2,
-    "val_data_eps": 2,
+    "train_data_eps": 1600,
+    "eval_data_eps": 200,
+    "val_data_eps": 200,
     "gamma": 0.3,
     "epsilon": 1.0,
     "batch_size": 32
@@ -378,13 +378,15 @@ for i, gamma in enumerate(gamma_list):
 
 # # Adjust layout
 fig_training.tight_layout()
+fig_returns.tight_layout()
 # fig_testing.tight_layout()
 # fig_validation.tight_layout()
 
 # # Save figures
-# fig_training.savefig("training_loss_gammas.png")
+fig_training.savefig("train_valid_loss_gammas.png")
+fig_returns.savefig("mean_return_gammas.png")
 # fig_testing.savefig("testing_loss_gammas.png")
 # fig_validation.savefig("validation_loss_gammas.png")
 
-plt.show()
+# plt.show()
 
