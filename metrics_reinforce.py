@@ -17,8 +17,8 @@ import torch.nn.functional as F
 
 
 CONFIG = {
-    "total_eps": 3000,
-    "eval_freq": 300,
+    "total_eps": 100,
+    "eval_freq": 1,
     "train_data_eps": 800,
     "eval_data_eps": 100,
     "val_data_eps": 100,
@@ -268,33 +268,34 @@ stats, mean_return_list, valid_loss_list, test_loss_list = train(
     )
 
 value_loss = stats['v_loss']
-plt.plot(value_loss, linewidth=1.0)
+plt.plot(value_loss, 'c', linewidth=1.0)
+plt.plot(valid_loss_list, 'g', linewidth=1.0)
 plt.title(f"Value Loss - Training Data")
 plt.xlabel("Epoch")
-plt.savefig("training_loss.png")
+plt.savefig("training_valid_loss.png")
 plt.close()
 # plt.show()
 
 x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps'] + 1, CONFIG['eval_freq'])
-plt.plot(x_ticks, valid_loss_list, linewidth=1.0)
-plt.title(f"Value Loss - Validation Data")
-plt.xlabel("Epoch")
-plt.savefig("validation_loss.png")
-plt.close()
+# plt.plot(x_ticks, valid_loss_list, linewidth=1.0)
+# plt.title(f"Value Loss - Validation Data")
+# plt.xlabel("Epoch")
+# # plt.savefig("validation_loss.png")
+# # plt.close()
 # plt.show()
 
-plt.plot(x_ticks, test_loss_list, linewidth=1.0)
-plt.title(f"Value Loss - Testing Data")
-plt.xlabel("Epoch")
-plt.savefig("testing_loss.png")
-plt.close()
+# plt.plot(x_ticks, test_loss_list, linewidth=1.0)
+# plt.title(f"Value Loss - Testing Data")
+# plt.xlabel("Epoch")
+# # plt.savefig("testing_loss.png")
+# # plt.close()
 # plt.show()
 
 plt.plot(x_ticks, mean_return_list, linewidth=1.0)
 plt.title(f"Mean Return")
 plt.xlabel("Epoch")
 plt.savefig("mean_returns.png")
-# plt.close()
+plt.close()
 # plt.show()
 
 
