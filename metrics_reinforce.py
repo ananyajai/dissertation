@@ -30,7 +30,7 @@ CONFIG = {
 
 # Define the value function neural network
 state_size = 12
-action_size = 20
+action_size = 5
 value_net = Network(dims=(state_size+action_size, 32, 32, 1), output_activation=None)
 value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
