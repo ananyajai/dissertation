@@ -20,9 +20,9 @@ import torch.nn.functional as F
 CONFIG = {
     "total_eps": 50,
     "eval_freq": 1,
-    "train_data_eps": 1600,
-    "eval_data_eps": 200,
-    "val_data_eps": 200,
+    "train_data_eps": 16,
+    "eval_data_eps": 2,
+    "val_data_eps": 2,
     "gamma": 0.3,
     "epsilon": 1.0,
     "batch_size": 32
@@ -316,22 +316,25 @@ plt.show()
 # plt.show()
 
 
-gamma_list = np.linspace(0, 1, 11)
+gamma_list = np.linspace(0, 1, 3)
 
 # Set up the subplot grid
 fig_training, axs_training = plt.subplots(3, 4, figsize=(20, 15))
 # fig_testing, axs_testing = plt.subplots(3, 4, figsize=(20, 15))
 # fig_validation, axs_validation = plt.subplots(3, 4, figsize=(20, 15))
+fig_returns, axs_returns = plt.subplots(3, 4, figsize=(20, 15))
 
 # Flatten the axes arrays for easy indexing
 axs_training = axs_training.flatten()
 # axs_testing = axs_testing.flatten()
 # axs_validation = axs_validation.flatten()
+axs_returns = axs_returns.flatten()
 
 # Remove the last subplot (12th) if not needed
 fig_training.delaxes(axs_training[-1])
 # fig_testing.delaxes(axs_testing[-1])
 # fig_validation.delaxes(axs_validation[-1])
+fig_returns.delaxes(axs_returns[-1])
 
 # Start training
 for i, gamma in enumerate(gamma_list):
@@ -347,6 +350,11 @@ for i, gamma in enumerate(gamma_list):
     )
 
     value_loss = stats['v_loss']
+
+    # Plot mean return
+    axs_returns[i].plot(mean_return_list, 'c', linewidth=1.0)
+    axs_returns[i].set_title(f"Mean Return, γ={gamma:.1f}")
+    axs_returns[i].set_xlabel("Iteration")
 
     # Plot training loss
     axs_training[i].plot(value_loss, 'c', linewidth=1.0, label='Training Loss')
