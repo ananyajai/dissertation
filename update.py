@@ -15,14 +15,13 @@ def update(
         # Initialise loss and returns
         v_loss = 0
         p_loss = 0
-        G = 0
         traj_length = len(observations)
 
-        # Normalise rewards
-        rewards = np.array(rewards)
-        reward_mean = np.mean(rewards)
-        reward_std = np.std(rewards) + 1e-10  # Add a small value to avoid division by zero
-        normalised_rewards = (rewards - reward_mean) / reward_std
+        # # Normalise rewards
+        # rewards = np.array(rewards)
+        # reward_mean = np.mean(rewards)
+        # reward_std = np.std(rewards) + 1e-10  # Add a small value to avoid division by zero
+        # normalised_rewards = (rewards - reward_mean) / reward_std
 
         # Flatten each observation and create one-hot encodings for actions
         flattened_observations = [obs.flatten() for obs in observations]
@@ -42,13 +41,13 @@ def update(
         # eps = 1e-10
         # action_probabilities = policy_net(obs_tensor) + eps
         
-        # Precompute returns G for every timestep
-        G = [ 0 for n in range(traj_length) ]
-        G[-1] = normalised_rewards[-1]
-        for t in range(traj_length - 2, -1, -1):
-            G[t] = normalised_rewards[t] + gamma * G[t + 1]
+        # # Precompute returns G for every timestep
+        # G = [ 0 for n in range(traj_length) ]
+        # G[-1] = normalised_rewards[-1]
+        # for t in range(traj_length - 2, -1, -1):
+        #     G[t] = normalised_rewards[t] + gamma * G[t + 1]
 
-        G = torch.tensor(G, dtype=torch.float32)
+        G = torch.tensor(rewards, dtype=torch.float32)
         v_loss = F.mse_loss(baseline_values, G)
         # advantage = G - baseline_values
         # p_loss = torch.mean(-advantage * torch.log(action_probabilities[torch.arange(traj_length), actions]))
@@ -58,11 +57,11 @@ def update(
         # p_loss.backward(retain_graph=True)
         # torch.nn.utils.clip_grad_norm_(policy_net.parameters(), max_norm=1.0)       # Gradient clipping
         # policy_optim.step()
-
+        
         # Backpropogate and perform optimisation step for the value function
         value_optim.zero_grad()
         v_loss.backward()
         torch.nn.utils.clip_grad_norm_(value_net.parameters(), max_norm=1.0)       # Gradient clipping
         value_optim.step()
 
-        return {"v_loss": float(v_loss)}, G
+        return {"v_loss": float(v_loss)}

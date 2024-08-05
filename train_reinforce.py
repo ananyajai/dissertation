@@ -189,7 +189,7 @@ def train(total_eps: int, market_params: tuple, eval_freq: int, epsilon, batch_s
 
      
 
-state_size = 40
+state_size = 12
 action_size = 3
 # policy_net = Network(
 #     dims=(40, 32, 21), output_activation=nn.Softmax(dim=-1)

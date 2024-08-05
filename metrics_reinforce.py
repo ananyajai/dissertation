@@ -18,11 +18,11 @@ import torch.nn.functional as F
 
 
 CONFIG = {
-    "total_eps": 50,
+    "total_eps": 100,
     "eval_freq": 1,
-    "train_data_eps": 1600,
-    "eval_data_eps": 200,
-    "val_data_eps": 200,
+    "train_data_eps": 80,
+    "eval_data_eps": 20,
+    "val_data_eps": 20,
     "gamma": 0.3,
     "epsilon": 1.0,
     "batch_size": 32
@@ -66,35 +66,61 @@ dump_flags = {'dump_strats': False, 'dump_lobs': False, 'dump_avgbals': False, '
 verbose = False
 
 
-def generate_data(total_eps: int, market_params: tuple, eps_file: str, output_file: str):
+def generate_data(total_eps: int, gamma:float, market_params: tuple, eps_file: str) -> Tuple[List, List, List]:
     """
-    Generates testing data by running market session eval_eps 
-    times and saving the trajectory data to a csv file.
+    Generates testing data by running market session total_eps times.
 
     Args:
-        eval_eps (int): Total number of times to run market session.
+        total_eps (int): Total number of times to run market session.
+        gamma (float): Discounting factor for calculating returns
         market_params (tuple): Parameters for running market session.
-        file (str): File path where the trajectory from each market session is stored.
-    """
-    obs_list = []
-    action_list = []
-    reward_list = []
+        eps_file (str): File path where the output of each market session is stored.
 
+    Returns:
+        Tuple: Normalised observations, actions, and returns (G).
+    """
+    obs_list, action_list, G_list = [], [], []
+
+    # Remove previous data files if they exist
     try:
-        send2trash([eps_file, output_file])
+        send2trash([eps_file])
     except:
         pass 
 
-    for _ in range(total_eps):
+    for i in range(total_eps):
         market_session(*market_params)
-        eps_obs, eps_action, eps_reward = load_episode_data(eps_file)
-        for obs, action, reward in zip(eps_obs, eps_action, eps_reward):
-            if not np.all(obs == 0):  # Check if the observation is not a zero tensor
-                obs_list.append(obs)
-                action_list.append(action)
-                reward_list.append(reward)
+        eps_obs, eps_actions, eps_rewards = load_episode_data(eps_file)
+        
+        try:
+            # Precompute returns G for every timestep
+            G = [ 0 for n in range(len(eps_obs)) ]
+            G[-1] = eps_rewards[-1]
+            for t in range(len(eps_obs) - 2, -1, -1):
+                G[t] = eps_rewards[t] + gamma * G[t + 1]
 
-    return np.array(obs_list), np.array(action_list), np.array(reward_list)
+            obs_list.extend(eps_obs)
+            action_list.extend(eps_actions)
+            G_list.extend(G)
+        
+        except:
+            pass
+
+    # Convert lists to numpy arrays
+    obs_array = np.array(obs_list)
+    action_array = np.array(action_list)
+    G_array = np.array(G_list)
+
+    # Normalise observations
+    obs_mean = np.mean(obs_array, axis=0)
+    obs_std = np.std(obs_array, axis=0) + 1e-10
+    normalised_obs = (obs_array - obs_mean) / obs_std
+
+    # Normalise returns (G)
+    G_mean = np.mean(G_array)
+    G_std = np.std(G_array) + 1e-10
+    normalised_G = (G_array - G_mean) / G_std
+
+    return normalised_obs, action_array, normalised_G
 
 
 def load_episode_data(file: str) -> Tuple[List, List, List]:
@@ -137,7 +163,7 @@ def train(
                 action_batch = train_actions[i:i + batch_size]
                 reward_batch = train_rewards[i:i + batch_size]
 
-                update_results, G = update(value_net, value_optim, obs_batch, action_batch, reward_batch, gamma=gamma)
+                update_results = update(value_net, value_optim, obs_batch, action_batch, reward_batch, gamma=gamma)
 
                 for key, value in update_results.items():
                     ep_value_loss.append(value)
@@ -154,6 +180,7 @@ def train(
         # Evaluate the policy at specified intervals
         if episode % eval_freq == 0:
             torch.save(value_net.state_dict(), 'value_net_checkpoint.pt')
+            value_net.load_state_dict(torch.load('value_net_checkpoint.pt'))
 
             mean_return = eval_mean_returns(
                 num_trials=10, value_net=value_net, market_params=market_params
@@ -180,7 +207,7 @@ def train(
             tqdm.write(f"TESTING: EPOCH {episode} - VALUE LOSS {testing_loss}")
             test_loss_list.append(testing_loss)
 
-    return stats, mean_returns_list, valid_loss_list, test_loss_list, G
+    return stats, mean_returns_list, valid_loss_list, test_loss_list
 
 
 def evaluate(
@@ -245,27 +272,27 @@ def eval_mean_returns(num_trials, value_net, market_params, model_path:str = 'va
 
 
 # Generate training data
-train_obs, train_actions, train_rewards = generate_data(CONFIG['train_data_eps'], 
+train_obs, train_actions, train_rewards = generate_data(CONFIG['train_data_eps'],
+              gamma=0.2,                                           
               market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
-              eps_file='episode_seller.csv', 
-              output_file='training_data.csv'
+              eps_file='episode_seller.csv' 
               )
 
 # Generate validation data
 val_obs, val_actions, val_rewards = generate_data(CONFIG['val_data_eps'], 
+              gamma=0.2,                                                  
               market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
-              eps_file='episode_seller.csv', 
-              output_file='validation_data.csv'
+              eps_file='episode_seller.csv' 
               )
 
 # Generate testing data
 test_obs, test_actions, test_rewards = generate_data(CONFIG['eval_data_eps'], 
+              gamma=0.2,
               market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
-              eps_file='episode_seller.csv', 
-              output_file='testing_data.csv'
+              eps_file='episode_seller.csv'
               )
 
-stats, mean_return_list, valid_loss_list, test_loss_list, G = train(
+stats, mean_return_list, valid_loss_list, test_loss_list = train(
         train_obs, train_actions, train_rewards,
         val_obs, val_actions, val_rewards,
         test_obs, test_actions, test_rewards,
@@ -293,7 +320,7 @@ plt.legend()
 # plt.close()
 plt.show()
 
-# x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps'] + 1, CONFIG['eval_freq'])
+x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps'] + 1, CONFIG['eval_freq'])
 # plt.plot(x_ticks, valid_loss_list, linewidth=1.0)
 # plt.title(f"Value Loss - Validation Data")
 # plt.xlabel("Epoch")
@@ -301,67 +328,67 @@ plt.show()
 # # plt.close()
 # plt.show()
 
-# plt.plot(x_ticks, test_loss_list, linewidth=1.0)
-# plt.title(f"Value Loss - Testing Data")
-# plt.xlabel("Epoch")
+plt.plot(x_ticks, test_loss_list, linewidth=1.0)
+plt.title(f"Value Loss - Testing Data")
+plt.xlabel("Epoch")
 # # plt.savefig("testing_loss.png")
 # # plt.close()
-# plt.show()
+plt.show()
 
-# plt.plot(x_ticks, mean_return_list, linewidth=1.0)
-# plt.title(f"Mean Return")
-# plt.xlabel("Epoch")
+plt.plot(x_ticks, mean_return_list, linewidth=1.0)
+plt.title(f"Mean Returns")
+plt.xlabel("Epoch")
 # plt.savefig("mean_returns.png")
 # plt.close()
-# plt.show()
+plt.show()
 
 
-gamma_list = np.linspace(0, 1, 3)
+# gamma_list = np.linspace(0, 1, 11)
 
 # Set up the subplot grid
-fig_training, axs_training = plt.subplots(3, 4, figsize=(20, 15))
+# fig_training, axs_training = plt.subplots(3, 4, figsize=(20, 15))
 # fig_testing, axs_testing = plt.subplots(3, 4, figsize=(20, 15))
 # fig_validation, axs_validation = plt.subplots(3, 4, figsize=(20, 15))
-fig_returns, axs_returns = plt.subplots(3, 4, figsize=(20, 15))
+# fig_returns, axs_returns = plt.subplots(3, 4, figsize=(20, 15))
 
 # Flatten the axes arrays for easy indexing
-axs_training = axs_training.flatten()
+# axs_training = axs_training.flatten()
 # axs_testing = axs_testing.flatten()
 # axs_validation = axs_validation.flatten()
-axs_returns = axs_returns.flatten()
+# axs_returns = axs_returns.flatten()
 
 # Remove the last subplot (12th) if not needed
-fig_training.delaxes(axs_training[-1])
+# fig_training.delaxes(axs_training[-1])
 # fig_testing.delaxes(axs_testing[-1])
 # fig_validation.delaxes(axs_validation[-1])
-fig_returns.delaxes(axs_returns[-1])
+# fig_returns.delaxes(axs_returns[-1])
 
-# Start training
-for i, gamma in enumerate(gamma_list):
-    stats, mean_return_list, valid_loss_list, test_loss_list, G = train(
-        train_obs, train_actions, train_rewards,
-        val_obs, val_actions, val_rewards,
-        test_obs, test_actions, test_rewards,
-        total_eps=CONFIG['total_eps'],
-        eval_freq=CONFIG["eval_freq"],
-        market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose),
-        gamma=gamma,
-        batch_size=CONFIG["batch_size"]
-    )
+# # Start training
+# for i, gamma in enumerate(gamma_list):
+#     stats, mean_return_list, valid_loss_list, test_loss_list, G = train(
+#         train_obs, train_actions, train_rewards,
+#         val_obs, val_actions, val_rewards,
+#         test_obs, test_actions, test_rewards,
+#         total_eps=CONFIG['total_eps'],
+#         eval_freq=CONFIG["eval_freq"],
+#         market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose),
+#         gamma=gamma,
+#         batch_size=CONFIG["batch_size"]
+#     )
 
-    value_loss = stats['v_loss']
+#     value_loss = stats['v_loss']
 
-    # Plot mean return
-    axs_returns[i].plot(mean_return_list, 'c', linewidth=1.0)
-    axs_returns[i].set_title(f"Mean Return, γ={gamma:.1f}")
-    axs_returns[i].set_xlabel("Iteration")
+#     # Plot mean return
+#     axs_returns[i].plot(mean_return_list, 'c', linewidth=1.0)
+#     axs_returns[i].set_title(f"Mean Return, γ={gamma:.1f}")
+#     axs_returns[i].set_xlabel("Iteration")
 
-    # Plot training loss
-    axs_training[i].plot(value_loss, 'c', linewidth=1.0, label='Training Loss')
-    axs_training[i].plot(valid_loss_list, 'g', linewidth=1.0, label='Validation Loss')
-    axs_training[i].set_title(f"Value Loss, γ={gamma:.1f}")
-    axs_training[i].set_xlabel("Iteration")
-    axs_training[i].set_ylabel("Loss")
+#     # Plot training loss
+#     axs_training[i].plot(value_loss, 'c', linewidth=1.0, label='Training Loss')
+#     axs_training[i].plot(valid_loss_list, 'g', linewidth=1.0, label='Validation Loss')
+#     axs_training[i].set_title(f"Value Loss, γ={gamma:.1f}")
+#     axs_training[i].set_xlabel("Iteration")
+#     axs_training[i].set_ylabel("Loss")
 
 #     # Plot testing loss
 #     x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps'] + 1, CONFIG['eval_freq'])
@@ -377,14 +404,14 @@ for i, gamma in enumerate(gamma_list):
 #     axs_validation[i].set_ylabel("Loss")
 
 # # Adjust layout
-fig_training.tight_layout()
-fig_returns.tight_layout()
+# fig_training.tight_layout()
+# fig_returns.tight_layout()
 # fig_testing.tight_layout()
 # fig_validation.tight_layout()
 
 # # Save figures
-fig_training.savefig("train_valid_loss_gammas.png")
-fig_returns.savefig("mean_return_gammas.png")
+# fig_training.savefig("train_valid_loss_gammas.png")
+# fig_returns.savefig("mean_return_gammas.png")
 # fig_testing.savefig("testing_loss_gammas.png")
 # fig_validation.savefig("validation_loss_gammas.png")
 
