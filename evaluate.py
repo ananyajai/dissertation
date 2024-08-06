@@ -9,7 +9,7 @@ from load_episode import load_episode_data
 import torch
 import torch.nn.functional as F
 
-action_size = 3
+action_size = 5
 
 
 def evaluate(market_params: tuple, value_net, file='testing_data.csv') -> Tuple[float, float]:
