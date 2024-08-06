@@ -31,8 +31,8 @@ CONFIG = {
 # Define the value function neural network
 state_size = 12
 action_size = 5
-value_net = Network(dims=(state_size+action_size, 32, 32, 1), output_activation=None)
-value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
+# value_net = Network(dims=(state_size+action_size, 32, 32, 1), output_activation=None)
+# value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
 # policy_net = Network(
 #     dims=(state_size, 32, 32, action_size), output_activation=nn.Softmax(dim=-1)
@@ -45,7 +45,7 @@ sess_id = 'session_1'
 start_time = 0.0
 end_time = 60.0
 
-sellers_spec = [('GVWY', 4), ('REINFORCE', 1, {'epsilon': 1.0, 'value_func': value_net})]
+sellers_spec = [('GVWY', 4), ('REINFORCE', 1, {'epsilon': 1.0})]
 buyers_spec = [('GVWY', 5)]
 
 trader_spec = {'sellers': sellers_spec, 'buyers': buyers_spec}
@@ -269,30 +269,30 @@ def eval_mean_returns(num_trials, value_net, market_params, model_path:str = 'va
 
 
 # Generate training data
-train_obs, train_actions, train_rewards = generate_data(CONFIG['train_data_eps'],
+train_obs, train_actions, train_G = generate_data(CONFIG['train_data_eps'],
               gamma=0.2,                                           
               market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
               eps_file='episode_seller.csv' 
               )
 
 # Generate validation data
-val_obs, val_actions, val_rewards = generate_data(CONFIG['val_data_eps'], 
+val_obs, val_actions, val_G = generate_data(CONFIG['val_data_eps'], 
               gamma=0.2,                                                  
               market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
               eps_file='episode_seller.csv' 
               )
 
 # Generate testing data
-test_obs, test_actions, test_rewards = generate_data(CONFIG['eval_data_eps'], 
+test_obs, test_actions, test_G = generate_data(CONFIG['eval_data_eps'], 
               gamma=0.2,
               market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
               eps_file='episode_seller.csv'
               )
 
 # stats, mean_return_list, valid_loss_list, test_loss_list = train(
-#         train_obs, train_actions, train_rewards,
-#         val_obs, val_actions, val_rewards,
-#         test_obs, test_actions, test_rewards,
+#         train_obs, train_actions, train_G,
+#         val_obs, val_actions, val_G,
+#         test_obs, test_actions, test_G,
 #         epochs=CONFIG['total_eps'],
 #         eval_freq=CONFIG["eval_freq"],
 #         market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose),
@@ -300,11 +300,9 @@ test_obs, test_actions, test_rewards = generate_data(CONFIG['eval_data_eps'],
 #         batch_size=CONFIG["batch_size"]
 #     )
 
-# customer_orders = [ train_obs[i][1] for i in range(len(train_obs)) ]
-# print(train_obs, customer_orders)
-# plt.plot(customer_orders, G)
-# plt.xlabel('Customer Order')
-# plt.ylabel('Returns (G value)')
+# input_dist = [ np.linalg.norm(train_obs[i+1] - train_obs[i]) for i in range(len(train_obs)-1) ]
+# G_dist = [ train_G[i+1]-train_G[i] for i in range(len(train_G)-1) ]
+# plt.plot(input_dist, G_dist)
 # plt.show()
 
 # value_loss = stats['v_loss']
@@ -362,10 +360,14 @@ fig_returns.delaxes(axs_returns[-1])
 
 # Start training
 for i, gamma in enumerate(gamma_list):
+    # Reinitialise the neural network and optimizer for each gamma value
+    value_net = Network(dims=(state_size + action_size, 32, 32, 1), output_activation=None)
+    value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
+
     stats, mean_return_list, valid_loss_list, test_loss_list = train(
-        train_obs, train_actions, train_rewards,
-        val_obs, val_actions, val_rewards,
-        test_obs, test_actions, test_rewards,
+        train_obs, train_actions, train_G,
+        val_obs, val_actions, val_G,
+        test_obs, test_actions, test_G,
         epochs=CONFIG['total_eps'],
         eval_freq=CONFIG["eval_freq"],
         market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose),
