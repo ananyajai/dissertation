@@ -20,10 +20,10 @@ import torch.nn.functional as F
 CONFIG = {
     "total_eps": 50,
     "eval_freq": 1,
-    "train_data_eps": 3500,
-    "eval_data_eps": 1000,
-    "val_data_eps": 500,
-    "gamma": 0.3,
+    "train_data_eps": 7000,
+    "eval_data_eps": 2000,
+    "val_data_eps": 1000,
+    "gamma": 0.2,
     "epsilon": 1.0,
     "batch_size": 32
 }
@@ -31,8 +31,8 @@ CONFIG = {
 # Define the value function neural network
 state_size = 12
 action_size = 5
-# value_net = Network(dims=(state_size+action_size, 32, 32, 1), output_activation=None)
-# value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
+value_net = Network(dims=(state_size+action_size, 32, 32, 1), output_activation=None)
+value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
 # policy_net = Network(
 #     dims=(state_size, 32, 32, action_size), output_activation=nn.Softmax(dim=-1)
@@ -324,9 +324,9 @@ plt.plot(valid_loss_list, 'g', linewidth=1.0, label='Validation Loss')
 plt.title(f"Value Loss")
 plt.xlabel("Epoch")
 plt.legend()
-# plt.savefig("training_valid_loss.png")
+plt.savefig("training_valid_loss.png")
 # plt.close()
-plt.show()
+# plt.show()
 
 x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps'] + 1, CONFIG['eval_freq'])
 # # plt.plot(x_ticks, valid_loss_list, linewidth=1.0)
@@ -336,12 +336,12 @@ x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps'] + 1, CONFIG['eval_f
 # # # plt.close()
 # # plt.show()
 
-plt.plot(x_ticks, test_loss_list, linewidth=1.0)
-plt.title(f"Value Loss - Testing Data")
-plt.xlabel("Epoch")
+# plt.plot(x_ticks, test_loss_list, linewidth=1.0)
+# plt.title(f"Value Loss - Testing Data")
+# plt.xlabel("Epoch")
 # # plt.savefig("testing_loss.png")
 # # plt.close()
-plt.show()
+# plt.show()
 
 plt.plot(x_ticks, mean_return_list, linewidth=1.0, label='RL')
 plt.plot(x_ticks, gvwy_returns_list, linewidth=1.0, label='Giveaway')
