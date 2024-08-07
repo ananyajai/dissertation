@@ -20,9 +20,9 @@ import torch.nn.functional as F
 CONFIG = {
     "total_eps": 50,
     "eval_freq": 1,
-    "train_data_eps": 7000,
-    "eval_data_eps": 2000,
+    "train_data_eps": 3500,
     "val_data_eps": 1000,
+    "eval_data_eps": 500,
     "gamma": 0.2,
     "epsilon": 1.0,
     "batch_size": 32
@@ -398,7 +398,7 @@ for i, gamma in enumerate(gamma_list):
     x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps'] + 1, CONFIG['eval_freq'])
     axs_testing[i].plot(x_ticks, test_loss_list, 'c')
     axs_testing[i].set_title(f"Testing Loss, γ={gamma:.1f}")
-    axs_testing[i].set_xlabel("Epoch")
+    axs_testing[i].set_xlabel("Iteration")
     axs_testing[i].set_ylabel("Loss")
 
     # # Plot validation loss
@@ -414,9 +414,9 @@ fig_testing.tight_layout()
 # fig_validation.tight_layout()
 
 # # Save figures
-fig_training.savefig("train_valid_loss_gammas.png")
+fig_training.savefig("train_valid_loss_tradwinds.png")
 # fig_returns.savefig("mean_return_gammas.png")
-fig_testing.savefig("testing_loss_gammas.png")
+fig_testing.savefig("testing_loss_tradwinds.png")
 # # fig_validation.savefig("validation_loss_gammas.png")
 
 # plt.show()
