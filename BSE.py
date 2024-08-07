@@ -154,11 +154,23 @@ def get_state(type, lob, time, order):
     avg_bid, var_bid = calc_price_metrics(lob['bids']['lob'])
     avg_ask, var_ask = calc_price_metrics(lob['asks']['lob'])
 
+    avg_trade_price = 0
+    trade_prices = []
+    tape = lob['tape']
+    for i in range(len(tape)):
+        if tape[i]['type'] == 'Trade':
+            trade_prices.append(tape[i]['price'])
+    
+    last_trade_price = trade_prices[-1] if trade_prices else 0.0
+    if len(trade_prices) >= 10:
+        avg_trade_price = np.mean(trade_prices[-10:])
+    if len(trade_prices) > 0 and len(trade_prices) < 10:
+        avg_trade_price = np.mean(trade_prices)
+
     observation = np.array([float(time), float(order), int(n_buyers), int(n_sellers),
-                            float(best_bid), float(best_ask), float(worst_bid), 
-                            float(worst_ask), float(avg_bid), float(avg_ask),
-                            float(var_bid), float(var_ask)])
-    # rounded_obs = np.around(observation, decimals=3)
+                            float(best_bid), float(best_ask), float(worst_bid), float(worst_ask),
+                            float(avg_bid), float(avg_ask), float(var_bid), 
+                            float(var_ask), float(last_trade_price), float(avg_trade_price)])
 
     return observation
 
@@ -2149,12 +2161,13 @@ class Reinforce(RLAgent):
     ):
         
         super().__init__(ttype, tid, balance, params, time, action_space, obs_space, gamma, epsilon)
-        self.state_size = 12
+        self.state_size = 14
         self.action_size = self.action_space.n
         self.learning_rate = learning_rate
-        
-        self.profit_stepsize = 1/(self.action_size - 1)
+
         self.max_length = 0
+        self.max_order_price = bse_sys_maxprice/2
+        self.max_bse_price = bse_sys_maxprice
 
         self.q_network = Network(dims=(self.state_size + self.action_size, 32, 1))
         self.value_optim = Adam(self.q_network.parameters(), lr=learning_rate, eps=1e-3)
@@ -2167,10 +2180,18 @@ class Reinforce(RLAgent):
 
         # Check if they gave different parameters
         if type(params) is dict:
+            if 'max_order_price' in params:
+                self.max_order_price = params['max_order_price']
             if 'value_func' in params:
                 self.q_network = params['value_func']
             if 'epsilon' in params:
                 self.epsilon = params['epsilon']
+
+        # Calculate the allowed upper bound for the profit margin
+        profit_upperbound = (self.max_bse_price / self.max_order_price) - 1
+        # Calculate step size based on upper bound and number of actions
+        self.profit_stepsize = profit_upperbound/(self.action_size - 1)
+
 
     def preprocess_lob(self, lob: Dict) -> np.ndarray:
         """
@@ -2197,6 +2218,7 @@ class Reinforce(RLAgent):
         lob_array[1] = np.array(padded_asks, dtype=np.float32)
 
         return lob_array
+    
 
     def pad_lob(self, lob_list: List[List[int]], max_length: int) -> List[List[int]]:
         """
@@ -2434,7 +2456,7 @@ def populate_market(traders_spec, traders, shuffle, verbose):
                            obs_space=spaces.MultiDiscrete([120, 100, 10, 10, 10, 10, 10, 10]))
         elif robottype == 'REINFORCE':
             return Reinforce('REINFORCE', name, balance, parameters, time0, 
-                           action_space=spaces.Discrete(5), learning_rate=1e-3,
+                           action_space=spaces.Discrete(20), learning_rate=1e-3,
                            obs_space=spaces.Box(low=0, high=np.inf, shape=(2, 10, 2), dtype=np.float32))
         else:
             sys.exit('FATAL: don\'t know robot type %s\n' % robottype)
@@ -2495,6 +2517,7 @@ def populate_market(traders_spec, traders, shuffle, verbose):
         if ttype == 'REINFORCE':
             epsilon = trader_params.get('epsilon', 0.9)
             parameters = {'epsilon': epsilon}
+            parameters['max_order_price'] = trader_params.get('max_order_price', bse_sys_maxprice/2)
             if 'policy' in trader_params:
                 parameters['policy'] = trader_params['policy']
             if 'value_func' in trader_params:
@@ -2970,7 +2993,7 @@ if __name__ == "__main__":
     n_days = 10
     start_time = 0.0
     # end_time = 60.0 * 60.0 * 24 * n_days
-    end_time = 500.0
+    end_time = 15.0
     duration = end_time - start_time
 
     # schedule_offsetfn returns time-dependent offset, to be added to schedule prices
@@ -2998,11 +3021,9 @@ if __name__ == "__main__":
     #                   ]
 
     range1 = (50, 150)
-    # range1 = (4, 6)
     supply_schedule = [{'from': start_time, 'to': end_time, 'ranges': [range1], 'stepmode': 'fixed'}]
 
     range2 = (50, 150)
-    # range2 = (4, 6)
     demand_schedule = [{'from': start_time, 'to': end_time, 'ranges': [range2], 'stepmode': 'fixed'}]
 
     # new customer orders arrive at each trader approx once every order_interval seconds
@@ -3045,7 +3066,7 @@ if __name__ == "__main__":
 
         # buyers_spec = [('SHVR', 5), ('GVWY', 5), ('ZIC', 5), ('ZIP', 5)]
         # sellers_spec = [('SHVR', 5), ('GVWY', 5), ('ZIC', 5), ('ZIP', 5), ('RL', 1, {'q_table_seller': 'q_table_seller.csv', 'epsilon': 0.9})]
-        sellers_spec = [('SHVR', 1), ('GVWY', 1), ('ZIC', 1), ('ZIP', 1), ('REINFORCE', 1, {})]
+        sellers_spec = [('SHVR', 1), ('GVWY', 1), ('ZIC', 1), ('ZIP', 1), ('REINFORCE', 1, {'max_order_price': supply_schedule[0]['ranges'][0][1]})]
         buyers_spec = [('SHVR', 1), ('GVWY', 1), ('ZIC', 1), ('ZIP', 1)]
 
         traders_spec = {'sellers': sellers_spec, 'buyers': buyers_spec}
