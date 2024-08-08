@@ -47,6 +47,7 @@ class Network(nn.Module):
             layers.append(nn.Linear(dims[i], dims[i + 1]))
             if i < len(dims) - 2:
                 layers.append(nn.ReLU())
+                layers.append(nn.Dropout(p=0.5))
         if output_activation:
             layers.append(output_activation)
         return nn.Sequential(*layers)
@@ -66,12 +67,12 @@ class Network(nn.Module):
     
 
 # # Example usage
-# state_dim = 100  # Example state space size
+# state_dim = 10  # Example state space size
 # action_dim = 20  # Example action space size (number of possible actions)
 # hidden_layers = [128, 64]  # Example hidden layers
 
 # # Create an instance of the Network
-# policy_net = Network([state_dim] + [action_dim], nn.Softmax(dim=-1))
+# policy_net = Network((30, 32, 1), nn.Softmax(dim=-1))
 
 # # Generate a random state (for example purposes)
 # state = torch.FloatTensor([1.0, 0.5, -0.1, 0.0, 1.2, -0.7, 0.3, 0.8, -0.5, 0.6])
@@ -84,4 +85,3 @@ class Network(nn.Module):
 
 # print("Action probabilities:", action_probs)
 # print("Selected action:", action)
-

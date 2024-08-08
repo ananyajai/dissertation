@@ -20,9 +20,9 @@ import torch.nn.functional as F
 CONFIG = {
     "total_eps": 50,
     "eval_freq": 1,
-    "train_data_eps": 3500,
-    "val_data_eps": 1000,
-    "eval_data_eps": 500,
+    "train_data_eps": 800,
+    "val_data_eps": 100,
+    "eval_data_eps": 100,
     "gamma": 0.2,
     "epsilon": 1.0,
     "batch_size": 32
@@ -30,7 +30,7 @@ CONFIG = {
 # Define the value function neural network
 state_size = 14
 action_size = 20
-value_net = Network(dims=(state_size+action_size, 32, 32, 32, 32, 1), output_activation=None)
+value_net = Network(dims=(state_size+action_size, 32, 32, 1), output_activation=None)
 value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
 # policy_net = Network(
@@ -44,20 +44,20 @@ value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 # Define market parameters
 sess_id = 'session_1'
 start_time = 0.0
-end_time = 60.0
+end_time = 180.0
 
-range1 = (50, 100)
-range12 = (100, 150)
-supply_schedule = [{'from': start_time, 'to': 20.0, 'ranges': [range1], 'stepmode': 'fixed'},
-                   {'from': 20.0, 'to': 40.0, 'ranges': [range12], 'stepmode': 'fixed'},
-                   {'from': 40.0, 'to': end_time, 'ranges': [range1], 'stepmode': 'fixed'}]
-
+range1 = (50, 150)
+# range12 = (100, 150)
+# supply_schedule = [{'from': start_time, 'to': 20.0, 'ranges': [range1], 'stepmode': 'fixed'},
+#                    {'from': 20.0, 'to': 40.0, 'ranges': [range12], 'stepmode': 'fixed'},
+#                    {'from': 40.0, 'to': end_time, 'ranges': [range1], 'stepmode': 'fixed'}]
+supply_schedule = [{'from': start_time, 'to': end_time, 'ranges': [range1], 'stepmode': 'fixed'}]
 range2 = (50, 150)
 # demand_schedule = [{'from': start_time, 'to': end_time, 'ranges': [range2], 'stepmode': 'fixed'}]
 demand_schedule = supply_schedule
 
 # new customer orders arrive at each trader approx once every order_interval seconds
-order_interval = 60
+order_interval = 30
 
 order_schedule = {'sup': supply_schedule, 'dem': demand_schedule,
                 'interval': order_interval, 'timemode': 'drip-fixed'}
@@ -148,7 +148,7 @@ def train(
         val_obs, val_actions, val_rewards,
         test_obs, test_actions, test_rewards,
         epochs: int, eval_freq: int, market_params: tuple, 
-        gamma: float, batch_size: int=32
+        gamma: float, value_net, value_optim, batch_size: int=32,
     ) -> DefaultDict:
     # Dictionary to store training statistics
     stats = defaultdict(list)
@@ -184,17 +184,10 @@ def train(
         if iteration % eval_freq == 0:
             torch.save(value_net.state_dict(), 'value_net_checkpoint.pt')
             value_net.load_state_dict(torch.load('value_net_checkpoint.pt'))
-
-            # mean_rl_return, mean_gvwy_return = eval_mean_returns(
-            #     num_trials=10, value_net=value_net, market_params=market_params
-            # )
-            # # print(f"EVALUATION: EPOCH {iteration} - MEAN RETURN {mean_return}")
-            # mean_returns_list.append(mean_rl_return)
-            # gvwy_returns_list.append(mean_gvwy_return)
+            value_net.eval()
 
             validation_loss = evaluate(
-                val_obs, val_actions, val_rewards,
-                market_params=market_params, value_net=value_net
+                val_obs, val_actions, val_rewards, value_net=value_net
             )
             # print(f"VALIDATION: EPOCH {iteration} - VALUE LOSS {validation_loss}")
             valid_loss_list.append(validation_loss)
@@ -205,18 +198,16 @@ def train(
                 break
 
             testing_loss = evaluate(
-                test_obs, test_actions, test_rewards,
-                market_params=market_params, value_net=value_net
+                test_obs, test_actions, test_rewards, value_net=value_net
             )
-            tqdm.write(f"TESTING: EPOCH {iteration} - VALUE LOSS {testing_loss}")
+            # tqdm.write(f"TESTING: EPOCH {iteration} - VALUE LOSS {testing_loss}")
             test_loss_list.append(testing_loss)
 
-    return stats, mean_returns_list, valid_loss_list, test_loss_list
+    return stats, valid_loss_list, test_loss_list, value_net
 
 
 def evaluate(
-        obs_list, action_list, reward_list, 
-        market_params: tuple, value_net
+        obs_list, action_list, reward_list, value_net
     ) -> Tuple[float, float]:
 
     # Compute the return using the value_net
@@ -295,28 +286,28 @@ test_obs, test_actions, test_G = generate_data(CONFIG['eval_data_eps'],
               eps_file='episode_seller.csv'
               )
 
-# stats, mean_return_list, valid_loss_list, test_loss_list = train(
-#         train_obs, train_actions, train_G,
-#         val_obs, val_actions, val_G,
-#         test_obs, test_actions, test_G,
-#         epochs=CONFIG['total_eps'],
-#         eval_freq=CONFIG["eval_freq"],
-#         market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose),
-#         gamma=0.2,
-#         batch_size=CONFIG["batch_size"]
-#     )
+stats, valid_loss_list, test_loss_list, value_net = train(
+        train_obs, train_actions, train_G,
+        val_obs, val_actions, val_G,
+        test_obs, test_actions, test_G,
+        epochs=CONFIG['total_eps'],
+        eval_freq=CONFIG["eval_freq"],
+        market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose),
+        gamma=0.2, value_net=value_net, value_optim=value_optim,
+        batch_size=CONFIG["batch_size"]
+    )
 
-# value_loss = stats['v_loss']
-# plt.plot(value_loss, '#085ea8', linewidth=1.0, label='Training Loss')
-# plt.plot(valid_loss_list, '#d43d51', linewidth=1.0, label='Validation Loss')
-# plt.title(f"Value Loss")
-# plt.xlabel("Epoch")
-# plt.legend()
-# # plt.savefig("training_valid_loss.png")
-# # plt.close()
+value_loss = stats['v_loss']
+plt.plot(value_loss, '#085ea8', linewidth=1.0, label='Training Loss')
+plt.plot(valid_loss_list, '#d43d51', linewidth=1.0, label='Validation Loss')
+plt.title(f"Value Loss")
+plt.xlabel("Epoch")
+plt.legend()
+plt.savefig("training_valid_loss.png")
+plt.close()
 # plt.show()
 
-# x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps'] + 1, CONFIG['eval_freq'])
+x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps'] + 1, CONFIG['eval_freq'])
 # # plt.plot(x_ticks, valid_loss_list, linewidth=1.0)
 # # plt.title(f"Value Loss - Validation Data")
 # # plt.xlabel("Epoch")
@@ -324,11 +315,11 @@ test_obs, test_actions, test_G = generate_data(CONFIG['eval_data_eps'],
 # # # plt.close()
 # # plt.show()
 
-# plt.plot(x_ticks, test_loss_list, linewidth=1.0)
-# plt.title(f"Value Loss - Testing Data")
-# plt.xlabel("Epoch")
-# # plt.savefig("testing_loss.png")
-# # plt.close()
+plt.plot(x_ticks, test_loss_list, linewidth=1.0)
+plt.title(f"Value Loss - Testing Data")
+plt.xlabel("Epoch")
+plt.savefig("testing_loss.png")
+# plt.close()
 # plt.show()
 
 # plt.plot(x_ticks, mean_return_list, linewidth=1.0, label='RL')
@@ -341,82 +332,82 @@ test_obs, test_actions, test_G = generate_data(CONFIG['eval_data_eps'],
 # plt.show()
 
 
-gamma_list = np.linspace(0, 1, 11)
+# gamma_list = np.linspace(0, 1, 11)
 
-# Set up the subplot grid
-fig_training, axs_training = plt.subplots(3, 4, figsize=(20, 15))
-fig_testing, axs_testing = plt.subplots(3, 4, figsize=(20, 15))
-# fig_validation, axs_validation = plt.subplots(3, 4, figsize=(20, 15))
-# fig_returns, axs_returns = plt.subplots(3, 4, figsize=(20, 15))
+# # Set up the subplot grid
+# fig_training, axs_training = plt.subplots(3, 4, figsize=(20, 15))
+# fig_testing, axs_testing = plt.subplots(3, 4, figsize=(20, 15))
+# # fig_validation, axs_validation = plt.subplots(3, 4, figsize=(20, 15))
+# # fig_returns, axs_returns = plt.subplots(3, 4, figsize=(20, 15))
 
-# Flatten the axes arrays for easy indexing
-axs_training = axs_training.flatten()
-axs_testing = axs_testing.flatten()
-# axs_validation = axs_validation.flatten()
-# axs_returns = axs_returns.flatten()
+# # Flatten the axes arrays for easy indexing
+# axs_training = axs_training.flatten()
+# axs_testing = axs_testing.flatten()
+# # axs_validation = axs_validation.flatten()
+# # axs_returns = axs_returns.flatten()
 
-# Remove the last subplot (12th) if not needed
-fig_training.delaxes(axs_training[-1])
-fig_testing.delaxes(axs_testing[-1])
-# fig_validation.delaxes(axs_validation[-1])
-# fig_returns.delaxes(axs_returns[-1])
+# # Remove the last subplot (12th) if not needed
+# fig_training.delaxes(axs_training[-1])
+# fig_testing.delaxes(axs_testing[-1])
+# # fig_validation.delaxes(axs_validation[-1])
+# # fig_returns.delaxes(axs_returns[-1])
 
-# Start training
-for i, gamma in enumerate(gamma_list):
-    # Reinitialise the neural network and optimizer for each gamma value
-    value_net = Network(dims=(state_size + action_size, 32, 32, 1), output_activation=None)
-    value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
+# # Start training
+# for i, gamma in enumerate(gamma_list):
+#     # Reinitialise the neural network and optimizer for each gamma value
+#     value_net = Network(dims=(state_size + action_size, 32, 32, 32, 1), output_activation=None)
+#     value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
-    stats, mean_return_list, valid_loss_list, test_loss_list = train(
-        train_obs, train_actions, train_G,
-        val_obs, val_actions, val_G,
-        test_obs, test_actions, test_G,
-        epochs=CONFIG['total_eps'],
-        eval_freq=CONFIG["eval_freq"],
-        market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose),
-        gamma=0.2,
-        batch_size=CONFIG["batch_size"]
-    )
+#     stats, mean_return_list, valid_loss_list, test_loss_list = train(
+#         train_obs, train_actions, train_G,
+#         val_obs, val_actions, val_G,
+#         test_obs, test_actions, test_G,
+#         epochs=CONFIG['total_eps'],
+#         eval_freq=CONFIG["eval_freq"],
+#         market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose),
+#         gamma=0.2,
+#         batch_size=CONFIG["batch_size"]
+#     )
 
-    value_loss = stats['v_loss']
+#     value_loss = stats['v_loss']
 
-    # # Plot mean return
-    # axs_returns[i].plot(mean_return_list, 'c', linewidth=1.0)
-    # axs_returns[i].set_title(f"Mean Return, γ={gamma:.1f}")
-    # axs_returns[i].set_xlabel("Iteration")
+#     # # Plot mean return
+#     # axs_returns[i].plot(mean_return_list, 'c', linewidth=1.0)
+#     # axs_returns[i].set_title(f"Mean Return, γ={gamma:.1f}")
+#     # axs_returns[i].set_xlabel("Iteration")
 
-    # Plot training loss
-    axs_training[i].plot(value_loss, 'c', linewidth=1.0, label='Training Loss')
-    axs_training[i].plot(valid_loss_list, 'g', linewidth=1.0, label='Validation Loss')
-    axs_training[i].set_title(f"Value Loss, γ={gamma:.1f}")
-    axs_training[i].set_xlabel("Iteration")
-    axs_training[i].set_ylabel("Loss")
-    axs_training[i].legend()
+#     # Plot training loss
+#     axs_training[i].plot(value_loss, 'c', linewidth=1.0, label='Training Loss')
+#     axs_training[i].plot(valid_loss_list, 'g', linewidth=1.0, label='Validation Loss')
+#     axs_training[i].set_title(f"Value Loss, γ={gamma:.1f}")
+#     axs_training[i].set_xlabel("Iteration")
+#     axs_training[i].set_ylabel("Loss")
+#     axs_training[i].legend()
 
-    # Plot testing loss
-    x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps'] + 1, CONFIG['eval_freq'])
-    axs_testing[i].plot(x_ticks, test_loss_list, 'c')
-    axs_testing[i].set_title(f"Testing Loss, γ={gamma:.1f}")
-    axs_testing[i].set_xlabel("Iteration")
-    axs_testing[i].set_ylabel("Loss")
+#     # Plot testing loss
+#     x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps'] + 1, CONFIG['eval_freq'])
+#     axs_testing[i].plot(x_ticks, test_loss_list, 'c')
+#     axs_testing[i].set_title(f"Testing Loss, γ={gamma:.1f}")
+#     axs_testing[i].set_xlabel("Iteration")
+#     axs_testing[i].set_ylabel("Loss")
 
-    # # Plot validation loss
-    # axs_validation[i].plot(x_ticks, valid_loss_list, 'g')
-    # axs_validation[i].set_title(f"Validation Loss, γ={gamma:.1f}")
-    # axs_validation[i].set_xlabel("Epoch")
-    # axs_validation[i].set_ylabel("Loss")
+#     # # Plot validation loss
+#     # axs_validation[i].plot(x_ticks, valid_loss_list, 'g')
+#     # axs_validation[i].set_title(f"Validation Loss, γ={gamma:.1f}")
+#     # axs_validation[i].set_xlabel("Epoch")
+#     # axs_validation[i].set_ylabel("Loss")
 
-# Adjust layout
-fig_training.tight_layout()
-# fig_returns.tight_layout()
-fig_testing.tight_layout()
-# fig_validation.tight_layout()
+# # Adjust layout
+# fig_training.tight_layout()
+# # fig_returns.tight_layout()
+# fig_testing.tight_layout()
+# # fig_validation.tight_layout()
 
-# # Save figures
-fig_training.savefig("train_valid_loss_shift.png")
-# fig_returns.savefig("mean_return_gammas.png")
-fig_testing.savefig("testing_loss_shift.png")
-# # fig_validation.savefig("validation_loss_gammas.png")
+# # # Save figures
+# # fig_training.savefig("train_valid_loss_shift.png")
+# # # fig_returns.savefig("mean_return_gammas.png")
+# # fig_testing.savefig("testing_loss_shift.png")
+# # # fig_validation.savefig("validation_loss_gammas.png")
 
 # plt.show()
 
