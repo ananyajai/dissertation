@@ -30,7 +30,7 @@ CONFIG = {
 # Define the value function neural network
 state_size = 14
 action_size = 20
-value_net = Network(dims=(state_size+action_size, 32, 32, 1), output_activation=None)
+value_net = Network(dims=(state_size+action_size, 32, 32, 32, 32, 1), output_activation=None)
 value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
 # policy_net = Network(
@@ -38,27 +38,31 @@ value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 #     )
 # policy_optim = Adam(policy_net.parameters(), lr=1e-3, eps=1e-3)
 
-colours = ['#085ea8', '#5379b7', '#7e95c5', '#a5b3d4', '#cbd1e2', 
-           '#f1cfce', '#eeadad', '#e88b8d', '#df676e', '#d43d51']
+# colours = ['#085ea8', '#5379b7', '#7e95c5', '#a5b3d4', '#cbd1e2', 
+#            '#f1cfce', '#eeadad', '#e88b8d', '#df676e', '#d43d51']
 
 # Define market parameters
 sess_id = 'session_1'
 start_time = 0.0
-end_time = 180.0
+end_time = 60.0
 
-range1 = (50, 150)
-supply_schedule = [{'from': start_time, 'to': end_time, 'ranges': [range1], 'stepmode': 'fixed'}]
+range1 = (50, 100)
+range12 = (100, 150)
+supply_schedule = [{'from': start_time, 'to': 20.0, 'ranges': [range1], 'stepmode': 'fixed'},
+                   {'from': 20.0, 'to': 40.0, 'ranges': [range12], 'stepmode': 'fixed'},
+                   {'from': 40.0, 'to': end_time, 'ranges': [range1], 'stepmode': 'fixed'}]
 
 range2 = (50, 150)
-demand_schedule = [{'from': start_time, 'to': end_time, 'ranges': [range2], 'stepmode': 'fixed'}]
+# demand_schedule = [{'from': start_time, 'to': end_time, 'ranges': [range2], 'stepmode': 'fixed'}]
+demand_schedule = supply_schedule
 
 # new customer orders arrive at each trader approx once every order_interval seconds
-order_interval = 30
+order_interval = 60
 
 order_schedule = {'sup': supply_schedule, 'dem': demand_schedule,
                 'interval': order_interval, 'timemode': 'drip-fixed'}
-
-sellers_spec = [('GVWY', 4), ('REINFORCE', 1, {'epsilon': 1.0, 'max_order_price': supply_schedule[0]['ranges'][0][1]})]
+# 'max_order_price': supply_schedule[0]['ranges'][0][1]
+sellers_spec = [('GVWY', 4), ('REINFORCE', 1, {'epsilon': 1.0})]
 buyers_spec = [('GVWY', 5)]
 
 trader_spec = {'sellers': sellers_spec, 'buyers': buyers_spec}
@@ -291,7 +295,7 @@ test_obs, test_actions, test_G = generate_data(CONFIG['eval_data_eps'],
               eps_file='episode_seller.csv'
               )
 
-# stats, mean_return_list, valid_loss_list, test_loss_list, gvwy_returns_list = train(
+# stats, mean_return_list, valid_loss_list, test_loss_list = train(
 #         train_obs, train_actions, train_G,
 #         val_obs, val_actions, val_G,
 #         test_obs, test_actions, test_G,
@@ -301,11 +305,6 @@ test_obs, test_actions, test_G = generate_data(CONFIG['eval_data_eps'],
 #         gamma=0.2,
 #         batch_size=CONFIG["batch_size"]
 #     )
-
-# input_dist = [ np.linalg.norm(train_obs[i+1] - train_obs[i]) for i in range(len(train_obs)-1) ]
-# G_dist = [ train_G[i+1]-train_G[i] for i in range(len(train_G)-1) ]
-# plt.plot(input_dist, G_dist)
-# plt.show()
 
 # value_loss = stats['v_loss']
 # plt.plot(value_loss, '#085ea8', linewidth=1.0, label='Training Loss')
@@ -414,9 +413,9 @@ fig_testing.tight_layout()
 # fig_validation.tight_layout()
 
 # # Save figures
-fig_training.savefig("train_valid_loss_tradwinds.png")
+fig_training.savefig("train_valid_loss_shift.png")
 # fig_returns.savefig("mean_return_gammas.png")
-fig_testing.savefig("testing_loss_tradwinds.png")
+fig_testing.savefig("testing_loss_shift.png")
 # # fig_validation.savefig("validation_loss_gammas.png")
 
 # plt.show()
