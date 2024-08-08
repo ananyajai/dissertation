@@ -2169,21 +2169,16 @@ class Reinforce(RLAgent):
         self.max_order_price = bse_sys_maxprice/2
         self.max_bse_price = bse_sys_maxprice
 
-        self.q_network = Network(dims=(self.state_size + self.action_size, 32, 1))
+        self.q_network = Network(dims=(self.state_size + self.action_size, 32, 32, 1))
         self.value_optim = Adam(self.q_network.parameters(), lr=learning_rate, eps=1e-3)
-
-        # self.policy = Network(
-        #     dims=(self.state_size, self.action_size), output_activation=nn.Softmax(dim=-1)
-        #     )
-        
-        # self.policy_optim = Adam(self.policy.parameters(), lr=learning_rate, eps=1e-3)
 
         # Check if they gave different parameters
         if type(params) is dict:
             if 'max_order_price' in params:
                 self.max_order_price = params['max_order_price']
             if 'value_func' in params:
-                self.q_network = params['value_func']
+                self.q_network.load_state_dict(params['value_func'].state_dict())
+                # self.q_network = params['value_func']
             if 'epsilon' in params:
                 self.epsilon = params['epsilon']
 
@@ -2284,89 +2279,6 @@ class Reinforce(RLAgent):
                 writer.writerow([obs, action, reward])
 
         return order
-
-
-    # def getorder(self, time, countdown, lob):
-    #     if len(self.orders) < 1:
-    #         order = None
-
-    #     else:
-    #         order_type = self.orders[0].otype
-
-    #         # Extract relevant features from the lob
-    #         obs = self.preprocess_lob(lob)
-    #         state = torch.tensor(obs, dtype=torch.float32).flatten()
-    #         action_prob = self.policy(state)
-
-    #         # Explore - sample a random action
-    #         if random.uniform(0, 1) < self.epsilon:
-    #             if self.type == 'Buyer':
-    #                 action = self.action_space.sample()
-    #                 quote = self.orders[0].price * (1 - self.profit_stepsize*action)
-    #             elif self.type == 'Seller':
-    #                 action = self.action_space.sample()
-    #                 quote = self.orders[0].price * (1 + self.profit_stepsize*action)
-
-    #         # Exploit - choose the action with the highest probability
-    #         else:
-    #             if self.type == 'Buyer':
-    #                 action = torch.argmax(action_prob).item()
-    #                 quote = self.orders[0].price * (1 - self.profit_stepsize*action)
-    #             elif self.type == 'Seller':
-    #                 action = torch.argmax(action_prob).item()
-    #                 quote = self.orders[0].price * (1 + self.profit_stepsize*action)
-
-    #         # Check if it's a bad bid
-    #         if self.type == 'Buyer' and quote > self.orders[0].price:
-    #             quote = self.orders[0].price
-            
-    #         # Check if it's a bad ask
-    #         elif self.type == 'Seller' and quote < self.orders[0].price:
-    #             quote = self.orders[0].price
-
-    #         order = Order(self.tid, order_type, (quote), self.orders[0].qty, time, lob['QID'])
-
-    #         if self.type == 'Buyer':
-    #             file = 'episode_buyer.csv'
-    #         elif self.type == 'Seller':
-    #             file = 'episode_seller.csv'
-            
-    #         # Write the current state, action and reward
-    #         reward = 0.0
-    #         with open(file, 'a', newline='') as f:
-    #             writer = csv.writer(f)
-    #             writer.writerow([obs, action, reward])
-        
-
-    #     return order
-    
-
-    def update(
-        self, observations: List[np.ndarray], actions: List[int], rewards: List[float],
-        ) -> Dict[str, float]:
-        # Initialise loss and returns
-        p_loss = 0
-        G = 0
-        traj_length = len(observations)
-
-        # Compute action probabilities using the current policy
-        action_probabilities = self.policy(torch.tensor(observations, dtype=torch.float32))
-
-        # Loop backwards in the episode
-        for t in range(traj_length - 2, -1, -1):
-            G = self.gamma * G + rewards[t+1]
-            action_prob = action_probabilities[t, actions[t]]   # Probability of the action at time step t
-            p_loss = p_loss - G * torch.log(action_prob)   # Minimise loss function
-
-        p_loss = p_loss/traj_length   # Normalise policy loss
-
-        # Backpropogate and perform optimisation step
-        self.policy_optim.zero_grad()
-        p_loss.backward()
-        self.policy_optim.step()
-
-        return {"p_loss": float(p_loss)}
-
 
 
 ########################---trader-types have all been defined now--################
