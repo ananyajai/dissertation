@@ -20,16 +20,16 @@ import torch.nn.functional as F
 CONFIG = {
     "total_eps": 50,
     "eval_freq": 1,
-    "train_data_eps": 80,
-    "val_data_eps": 10,
-    "eval_data_eps": 10,
+    "train_data_eps": 3500,
+    "val_data_eps": 1000,
+    "eval_data_eps": 500,
     "gamma": 0.2,
     "epsilon": 1.0,
     "batch_size": 32
 }
 # Define the value function neural network
 state_size = 14
-action_size = 5
+action_size = 20
 value_net = Network(dims=(state_size+action_size, 32, 32, 1), output_activation=None)
 value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
@@ -44,7 +44,7 @@ value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 # Define market parameters
 sess_id = 'session_1'
 start_time = 0.0
-end_time = 60.0
+end_time = 180.0
 
 range1 = (50, 150)
 # range12 = (100, 150)
@@ -57,7 +57,7 @@ range2 = (50, 150)
 demand_schedule = supply_schedule
 
 # new customer orders arrive at each trader approx once every order_interval seconds
-order_interval = 60
+order_interval = 30
 
 order_schedule = {'sup': supply_schedule, 'dem': demand_schedule,
                 'interval': order_interval, 'timemode': 'drip-fixed'}
@@ -189,7 +189,7 @@ def train(
             validation_loss = evaluate(
                 val_obs, val_actions, val_rewards, value_net=value_net
             )
-            print(f"VALIDATION: EPOCH {iteration} - VALUE LOSS {validation_loss}")
+            # print(f"VALIDATION: EPOCH {iteration} - VALUE LOSS {validation_loss}")
             valid_loss_list.append(validation_loss)
 
             early_stop = EarlyStopping()
@@ -200,7 +200,7 @@ def train(
             testing_loss = evaluate(
                 test_obs, test_actions, test_rewards, value_net=value_net
             )
-            tqdm.write(f"TESTING: EPOCH {iteration} - VALUE LOSS {testing_loss}")
+            # tqdm.write(f"TESTING: EPOCH {iteration} - VALUE LOSS {testing_loss}")
             test_loss_list.append(testing_loss)
 
     return stats, valid_loss_list, test_loss_list, value_net
@@ -266,45 +266,45 @@ def eval_mean_returns(num_trials, value_net, market_params, model_path:str = 'va
 
 
 # Generate training data
-train_obs, train_actions, train_G = generate_data(CONFIG['train_data_eps'],
-              gamma=0.2,                                           
-              market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
-              eps_file='episode_seller.csv' 
-              )
+# train_obs, train_actions, train_G = generate_data(CONFIG['train_data_eps'],
+#               gamma=0.2,                                           
+#               market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
+#               eps_file='episode_seller.csv' 
+#               )
 
-# Generate validation data
-val_obs, val_actions, val_G = generate_data(CONFIG['val_data_eps'], 
-              gamma=0.2,                                                  
-              market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
-              eps_file='episode_seller.csv' 
-              )
+# # Generate validation data
+# val_obs, val_actions, val_G = generate_data(CONFIG['val_data_eps'], 
+#               gamma=0.2,                                                  
+#               market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
+#               eps_file='episode_seller.csv' 
+#               )
 
-# Generate testing data
-test_obs, test_actions, test_G = generate_data(CONFIG['eval_data_eps'], 
-              gamma=0.2,
-              market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
-              eps_file='episode_seller.csv'
-              )
+# # Generate testing data
+# test_obs, test_actions, test_G = generate_data(CONFIG['eval_data_eps'], 
+#               gamma=0.2,
+#               market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
+#               eps_file='episode_seller.csv'
+#               )
 
-stats, valid_loss_list, test_loss_list, value_net = train(
-        train_obs, train_actions, train_G,
-        val_obs, val_actions, val_G,
-        test_obs, test_actions, test_G,
-        epochs=CONFIG['total_eps'],
-        eval_freq=CONFIG["eval_freq"],
-        market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose),
-        gamma=0.2, value_net=value_net, value_optim=value_optim,
-        batch_size=CONFIG["batch_size"]
-    )
+# stats, valid_loss_list, test_loss_list, value_net = train(
+#         train_obs, train_actions, train_G,
+#         val_obs, val_actions, val_G,
+#         test_obs, test_actions, test_G,
+#         epochs=CONFIG['total_eps'],
+#         eval_freq=CONFIG["eval_freq"],
+#         market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose),
+#         gamma=0.2, value_net=value_net, value_optim=value_optim,
+#         batch_size=CONFIG["batch_size"]
+#     )
 
-value_loss = stats['v_loss']
-plt.plot(value_loss, 'c', linewidth=1.0, label='Training Loss')
-plt.plot(valid_loss_list, 'g', linewidth=1.0, label='Validation Loss')
-plt.title(f"Value Loss")
-plt.xlabel("Epoch")
-plt.legend()
-plt.savefig("training_valid_loss.png")
-plt.close()
+# value_loss = stats['v_loss']
+# plt.plot(value_loss, 'c', linewidth=1.0, label='Training Loss')
+# plt.plot(valid_loss_list, 'g', linewidth=1.0, label='Validation Loss')
+# plt.title(f"Value Loss")
+# plt.xlabel("Epoch")
+# plt.legend()
+# plt.savefig("training_valid_loss.png")
+# plt.close()
 # plt.show()
 
 # x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps'] + 1, CONFIG['eval_freq'])
@@ -315,10 +315,10 @@ plt.close()
 # # # # plt.close()
 # # # plt.show()
 
-plt.plot(test_loss_list, linewidth=1.0)
-plt.title(f"Value Loss - Testing Data")
-plt.xlabel("Epoch")
-plt.savefig("testing_loss.png")
+# plt.plot(test_loss_list, linewidth=1.0)
+# plt.title(f"Value Loss - Testing Data")
+# plt.xlabel("Epoch")
+# plt.savefig("testing_loss.png")
 # plt.close()
 # plt.show()
 
