@@ -44,7 +44,7 @@ value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 # Define market parameters
 sess_id = 'session_1'
 start_time = 0.0
-end_time = 180.0
+end_time = 60.0
 
 range1 = (50, 150)
 # range12 = (100, 150)
@@ -57,7 +57,7 @@ range2 = (50, 150)
 demand_schedule = supply_schedule
 
 # new customer orders arrive at each trader approx once every order_interval seconds
-order_interval = 30
+order_interval = 60
 
 order_schedule = {'sup': supply_schedule, 'dem': demand_schedule,
                 'interval': order_interval, 'timemode': 'drip-fixed'}
@@ -189,7 +189,7 @@ def train(
             validation_loss = evaluate(
                 val_obs, val_actions, val_rewards, value_net=value_net
             )
-            # print(f"VALIDATION: EPOCH {iteration} - VALUE LOSS {validation_loss}")
+            print(f"VALIDATION: EPOCH {iteration} - VALUE LOSS {validation_loss}")
             valid_loss_list.append(validation_loss)
 
             early_stop = EarlyStopping()
@@ -200,7 +200,7 @@ def train(
             testing_loss = evaluate(
                 test_obs, test_actions, test_rewards, value_net=value_net
             )
-            # tqdm.write(f"TESTING: EPOCH {iteration} - VALUE LOSS {testing_loss}")
+            tqdm.write(f"TESTING: EPOCH {iteration} - VALUE LOSS {testing_loss}")
             test_loss_list.append(testing_loss)
 
     return stats, valid_loss_list, test_loss_list, value_net
@@ -298,8 +298,8 @@ stats, valid_loss_list, test_loss_list, value_net = train(
     )
 
 value_loss = stats['v_loss']
-plt.plot(value_loss, '#085ea8', linewidth=1.0, label='Training Loss')
-plt.plot(valid_loss_list, '#d43d51', linewidth=1.0, label='Validation Loss')
+plt.plot(value_loss, 'c', linewidth=1.0, label='Training Loss')
+plt.plot(valid_loss_list, 'g', linewidth=1.0, label='Validation Loss')
 plt.title(f"Value Loss")
 plt.xlabel("Epoch")
 plt.legend()
@@ -308,12 +308,12 @@ plt.close()
 # plt.show()
 
 x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps'] + 1, CONFIG['eval_freq'])
-# # plt.plot(x_ticks, valid_loss_list, linewidth=1.0)
-# # plt.title(f"Value Loss - Validation Data")
-# # plt.xlabel("Epoch")
-# # # plt.savefig("validation_loss.png")
-# # # plt.close()
-# # plt.show()
+# # # plt.plot(x_ticks, valid_loss_list, linewidth=1.0)
+# # # plt.title(f"Value Loss - Validation Data")
+# # # plt.xlabel("Epoch")
+# # # # plt.savefig("validation_loss.png")
+# # # # plt.close()
+# # # plt.show()
 
 plt.plot(x_ticks, test_loss_list, linewidth=1.0)
 plt.title(f"Value Loss - Testing Data")
