@@ -24,10 +24,11 @@ CONFIG = {
     "train_data_eps": 3500,
     "val_data_eps": 1000,
     "eval_data_eps": 500,
-    "policy_improv": 20,
+    "policy_improv": 50,
     "epsilon": 1.0,
     "batch_size": 32
 }
+
 # Define the value function neural network
 state_size = 14
 action_size = 20
@@ -60,22 +61,19 @@ dump_flags = {'dump_strats': False, 'dump_lobs': False, 'dump_avgbals': True, 'd
 verbose = False
 
 # Generate training data
-train_obs, train_actions, train_G = generate_data(CONFIG['train_data_eps'],
-              gamma=0.2,                                           
+train_obs, train_actions, train_rewards = generate_data(CONFIG['train_data_eps'],                                    
               market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
               eps_file='episode_seller.csv' 
               )
 
 # Generate validation data
-val_obs, val_actions, val_G = generate_data(CONFIG['val_data_eps'], 
-              gamma=0.2,                                                  
+val_obs, val_actions, val_rewards = generate_data(CONFIG['val_data_eps'],                                                 
               market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
               eps_file='episode_seller.csv' 
               )
 
 # Generate testing data
-test_obs, test_actions, test_G = generate_data(CONFIG['eval_data_eps'], 
-              gamma=0.2,
+test_obs, test_actions, test_rewards = generate_data(CONFIG['eval_data_eps'], 
               market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
               eps_file='episode_seller.csv'
               )
@@ -83,21 +81,21 @@ test_obs, test_actions, test_G = generate_data(CONFIG['eval_data_eps'],
 mean_returns_list = []
 gvwy_returns_list = []
 
+value_net = Network(dims=(state_size+action_size, 32, 32, 1), output_activation=None)
+value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
+
 for iter in range(1, CONFIG['policy_improv']+1):
     print(f"GPI - {iter}")
-    value_net = Network(dims=(state_size+action_size, 32, 32, 1), output_activation=None)
-    value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
     # Policy evaluation
     stats, valid_loss_list, test_loss_list, value_net = train(
-        train_obs, train_actions, train_G,
-        val_obs, val_actions, val_G,
-        test_obs, test_actions, test_G,
+        train_obs, train_actions, train_rewards,
+        val_obs, val_actions, val_rewards,
+        test_obs, test_actions, test_rewards,
         epochs=CONFIG['num_epochs'],
         eval_freq=CONFIG["eval_freq"],
-        market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose),
-        gamma=0.2,
-        value_net=value_net, value_optim=value_optim, batch_size=CONFIG["batch_size"]
+        gamma=0.4, value_net=value_net, value_optim=value_optim,
+        batch_size=CONFIG["batch_size"]
     )
 
     # Policy improvement
@@ -121,11 +119,11 @@ plt.title('Policy Improvement')
 plt.savefig('policy_improvement.png')
 # plt.show()
 
-value_loss = stats['v_loss']
-plt.plot(value_loss, '#085ea8', linewidth=1.0, label='Training Loss')
-plt.plot(valid_loss_list, '#d43d51', linewidth=1.0, label='Validation Loss')
-plt.title(f"Value Loss")
-plt.xlabel("Epoch")
-plt.legend()
-plt.savefig('value_loss.png')
+# value_loss = stats['v_loss']
+# plt.plot(value_loss, '#085ea8', linewidth=1.0, label='Training Loss')
+# plt.plot(valid_loss_list, '#d43d51', linewidth=1.0, label='Validation Loss')
+# plt.title(f"Value Loss")
+# plt.xlabel("Epoch")
+# plt.legend()
+# # plt.savefig('value_loss.png')
 # plt.show()
