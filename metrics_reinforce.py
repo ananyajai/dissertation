@@ -44,20 +44,20 @@ value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 # Define market parameters
 sess_id = 'session_1'
 start_time = 0.0
-end_time = 180.0
+end_time = 60.0
 
-range1 = (50, 150)
-# range12 = (100, 150)
-# supply_schedule = [{'from': start_time, 'to': 20.0, 'ranges': [range1], 'stepmode': 'fixed'},
-#                    {'from': 20.0, 'to': 40.0, 'ranges': [range12], 'stepmode': 'fixed'},
-#                    {'from': 40.0, 'to': end_time, 'ranges': [range1], 'stepmode': 'fixed'}]
-supply_schedule = [{'from': start_time, 'to': end_time, 'ranges': [range1], 'stepmode': 'fixed'}]
-range2 = (50, 150)
+range1 = (50, 100)
+range2 = (100, 150)
+supply_schedule = [{'from': start_time, 'to': 20.0, 'ranges': [range1], 'stepmode': 'fixed'},
+                   {'from': 20.0, 'to': 40.0, 'ranges': [range2], 'stepmode': 'fixed'},
+                   {'from': 40.0, 'to': end_time, 'ranges': [range1], 'stepmode': 'fixed'}]
+# supply_schedule = [{'from': start_time, 'to': end_time, 'ranges': [range1], 'stepmode': 'fixed'}]
+# range2 = (50, 150)
 # demand_schedule = [{'from': start_time, 'to': end_time, 'ranges': [range2], 'stepmode': 'fixed'}]
 demand_schedule = supply_schedule
 
 # new customer orders arrive at each trader approx once every order_interval seconds
-order_interval = 30
+order_interval = 60
 
 order_schedule = {'sup': supply_schedule, 'dem': demand_schedule,
                 'interval': order_interval, 'timemode': 'drip-fixed'}
@@ -413,9 +413,9 @@ fig_testing.tight_layout()
 # fig_validation.tight_layout()
 
 # # Save figures
-fig_training.savefig("train_valid_loss_tradwinds.png")
+fig_training.savefig("train_valid_loss_shift.png")
 # # fig_returns.savefig("mean_return_gammas.png")
-fig_testing.savefig("testing_loss_tradwinds.png")
+fig_testing.savefig("testing_loss_shift.png")
 # # fig_validation.savefig("validation_loss_gammas.png")
 
 # plt.show()
