@@ -2170,7 +2170,7 @@ class Reinforce(RLAgent):
         self.max_bse_price = bse_sys_maxprice
 
         self.q_network = Network(dims=(self.state_size + self.action_size, 32, 32, 1))
-        self.value_optim = Adam(self.q_network.parameters(), lr=learning_rate, eps=1e-3)
+        self.value_optim = Adam(self.q_network.parameters(), lr=1e-3, eps=1e-3)
 
         # Check if they gave different parameters
         if type(params) is dict:
@@ -2178,7 +2178,6 @@ class Reinforce(RLAgent):
                 self.max_order_price = params['max_order_price']
             if 'value_func' in params:
                 self.q_network.load_state_dict(params['value_func'].state_dict())
-                # self.q_network = params['value_func']
             if 'epsilon' in params:
                 self.epsilon = params['epsilon']
 

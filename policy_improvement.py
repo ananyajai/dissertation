@@ -24,7 +24,7 @@ CONFIG = {
     "train_data_eps": 3500,
     "val_data_eps": 1000,
     "eval_data_eps": 500,
-    "policy_improv": 50,
+    "policy_improv": 200,
     "epsilon": 1.0,
     "batch_size": 32
 }
