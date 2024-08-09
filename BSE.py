@@ -2170,6 +2170,7 @@ class Reinforce(RLAgent):
         self.max_bse_price = bse_sys_maxprice
 
         self.q_network = Network(dims=(self.state_size + self.action_size, 32, 32, 1))
+        # self.q_network = Network(dims=(self.state_size, 32, 32, 1))
         self.value_optim = Adam(self.q_network.parameters(), lr=1e-3, eps=1e-3)
 
         # Check if they gave different parameters
