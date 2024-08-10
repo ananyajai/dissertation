@@ -6,7 +6,7 @@ from BSE import market_session
 from matplotlib import pyplot as plt
 from collections import defaultdict
 from typing import List, DefaultDict, Tuple
-from epsilon_scheduling import epsilon_decay
+from epsilon_scheduling import linear_epsilon_decay
 from early_stopping import EarlyStopping
 from update import update
 
@@ -29,9 +29,9 @@ CONFIG = {
 }
 # Define the value function neural network
 state_size = 14
-action_size = 20
-value_net = Network(dims=(state_size+action_size, 32, 32, 1), output_activation=None)
-value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
+action_size = 50
+# value_net = Network(dims=(state_size+action_size, 32, 32, 1), output_activation=None)
+# value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
 # policy_net = Network(
 #     dims=(state_size, 32, 32, action_size), output_activation=nn.Softmax(dim=-1)

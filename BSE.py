@@ -2164,7 +2164,7 @@ class Reinforce(RLAgent):
         self.state_size = 14
         self.action_size = self.action_space.n
         self.learning_rate = learning_rate
-
+        
         self.max_length = 0
         self.max_order_price = bse_sys_maxprice/2
         self.max_bse_price = bse_sys_maxprice
@@ -2368,7 +2368,7 @@ def populate_market(traders_spec, traders, shuffle, verbose):
                            obs_space=spaces.MultiDiscrete([120, 100, 10, 10, 10, 10, 10, 10]))
         elif robottype == 'REINFORCE':
             return Reinforce('REINFORCE', name, balance, parameters, time0, 
-                           action_space=spaces.Discrete(20), learning_rate=1e-3,
+                           action_space=spaces.Discrete(50), learning_rate=1e-3,
                            obs_space=spaces.Box(low=0, high=np.inf, shape=(2, 10, 2), dtype=np.float32))
         else:
             sys.exit('FATAL: don\'t know robot type %s\n' % robottype)

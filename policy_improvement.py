@@ -6,7 +6,7 @@ from BSE import market_session
 from matplotlib import pyplot as plt
 from collections import defaultdict
 from typing import List, DefaultDict, Tuple
-from epsilon_scheduling import epsilon_decay
+from epsilon_scheduling import linear_epsilon_decay
 from early_stopping import EarlyStopping
 from update import update
 from metrics_reinforce import train, generate_data, eval_mean_returns
@@ -21,9 +21,9 @@ import torch.nn.functional as F
 CONFIG = {
     "num_epochs": 20,
     "eval_freq": 1,
-    "train_data_eps": 1000,
-    "val_data_eps": 300,
-    "eval_data_eps": 200,
+    "train_data_eps": 3500,
+    "val_data_eps": 1000,
+    "eval_data_eps": 500,
     "policy_improv": 50,
     "epsilon": 1.0,
     "batch_size": 32
@@ -31,7 +31,7 @@ CONFIG = {
 
 # Define the value function neural network
 state_size = 14
-action_size = 20
+action_size = 50
 # value_net = Network(dims=(state_size+action_size, 32, 32, 1), output_activation=None)
 # value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
@@ -52,7 +52,7 @@ order_interval = 60
 order_schedule = {'sup': supply_schedule, 'dem': demand_schedule,
                 'interval': order_interval, 'timemode': 'drip-fixed'}
 # 'max_order_price': supply_schedule[0]['ranges'][0][1]
-sellers_spec = [('GVWY', 4), ('REINFORCE', 1, {'epsilon': 1.0, 'max_order_price': supply_schedule[0]['ranges'][0][1]})]
+sellers_spec = [('GVWY', 4), ('REINFORCE', 1, {'epsilon': 0.8, 'max_order_price': supply_schedule[0]['ranges'][0][1]})]
 buyers_spec = [('GVWY', 5)]
 
 trader_spec = {'sellers': sellers_spec, 'buyers': buyers_spec}
@@ -60,6 +60,7 @@ trader_spec = {'sellers': sellers_spec, 'buyers': buyers_spec}
 dump_flags = {'dump_strats': False, 'dump_lobs': False, 'dump_avgbals': True, 'dump_tape': False, 'dump_blotters': False}
 verbose = False
 
+market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose)
 
 mean_returns_list = []
 gvwy_returns_list = []
@@ -68,6 +69,7 @@ value_net = Network(dims=(state_size+action_size, 32, 32, 1), output_activation=
 value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
 for iter in range(1, CONFIG['policy_improv']+1):
+
     # Generate training data
     train_obs, train_actions, train_rewards = generate_data(CONFIG['train_data_eps'],                                    
                 market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
@@ -101,13 +103,18 @@ for iter in range(1, CONFIG['policy_improv']+1):
 
     # Policy improvement
     mean_rl_return, mean_gvwy_return = eval_mean_returns(
-                num_trials=20000, value_net=value_net, 
+                num_trials=2000, value_net=value_net, 
                 market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose)
             )
     
     print(f"EVALUATION: ITERATION {iter} - MEAN RETURN {mean_rl_return}")
     mean_returns_list.append(mean_rl_return)
     gvwy_returns_list.append(mean_gvwy_return)
+
+    # Update epsilon value using linear decay
+    epsilon = linear_epsilon_decay(iter, CONFIG['policy_improv'])
+    updated_market_params = list(market_params)    
+    updated_market_params[3]['sellers'][1][2]['epsilon'] = epsilon
 
 
 # Plotting
@@ -116,9 +123,9 @@ plt.plot(gvwy_returns_list, 'g', label='GVWY')
 plt.legend()
 plt.xlabel('Iterations')
 plt.ylabel('Mean Returns')
-plt.title('Policy Improvement')
+# plt.title('Policy Improvement')
 plt.savefig('policy_improvement.png')
-# plt.show()
+plt.show()
 
 # value_loss = stats['v_loss']
 # plt.plot(value_loss, '#085ea8', linewidth=1.0, label='Training Loss')
