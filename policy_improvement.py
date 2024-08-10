@@ -21,10 +21,10 @@ import torch.nn.functional as F
 CONFIG = {
     "num_epochs": 20,
     "eval_freq": 1,
-    "train_data_eps": 3500,
-    "val_data_eps": 1000,
-    "eval_data_eps": 500,
-    "policy_improv": 200,
+    "train_data_eps": 1000,
+    "val_data_eps": 300,
+    "eval_data_eps": 200,
+    "policy_improv": 50,
     "epsilon": 1.0,
     "batch_size": 32
 }
@@ -60,23 +60,6 @@ trader_spec = {'sellers': sellers_spec, 'buyers': buyers_spec}
 dump_flags = {'dump_strats': False, 'dump_lobs': False, 'dump_avgbals': True, 'dump_tape': False, 'dump_blotters': False}
 verbose = False
 
-# Generate training data
-train_obs, train_actions, train_rewards = generate_data(CONFIG['train_data_eps'],                                    
-              market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
-              eps_file='episode_seller.csv' 
-              )
-
-# Generate validation data
-val_obs, val_actions, val_rewards = generate_data(CONFIG['val_data_eps'],                                                 
-              market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
-              eps_file='episode_seller.csv' 
-              )
-
-# Generate testing data
-test_obs, test_actions, test_rewards = generate_data(CONFIG['eval_data_eps'], 
-              market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
-              eps_file='episode_seller.csv'
-              )
 
 mean_returns_list = []
 gvwy_returns_list = []
@@ -85,6 +68,24 @@ value_net = Network(dims=(state_size+action_size, 32, 32, 1), output_activation=
 value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
 for iter in range(1, CONFIG['policy_improv']+1):
+    # Generate training data
+    train_obs, train_actions, train_rewards = generate_data(CONFIG['train_data_eps'],                                    
+                market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
+                eps_file='episode_seller.csv' 
+                )
+
+    # Generate validation data
+    val_obs, val_actions, val_rewards = generate_data(CONFIG['val_data_eps'],                                                 
+                market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
+                eps_file='episode_seller.csv' 
+                )
+
+    # Generate testing data
+    test_obs, test_actions, test_rewards = generate_data(CONFIG['eval_data_eps'], 
+                market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
+                eps_file='episode_seller.csv'
+                )
+
     print(f"GPI - {iter}")
 
     # Policy evaluation
@@ -100,7 +101,7 @@ for iter in range(1, CONFIG['policy_improv']+1):
 
     # Policy improvement
     mean_rl_return, mean_gvwy_return = eval_mean_returns(
-                num_trials=100, value_net=value_net, 
+                num_trials=20000, value_net=value_net, 
                 market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose)
             )
     
