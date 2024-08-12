@@ -17,11 +17,11 @@ import torch.nn.functional as F
 
 
 CONFIG = {
-    "total_eps": 50,
+    "total_eps": 20,
     "eval_freq": 1,
-    "train_data_eps": 3500,
-    "val_data_eps": 1000,
-    "eval_data_eps": 500,
+    "train_data_eps": 100,
+    "val_data_eps": 20,
+    "eval_data_eps": 20,
     "policy_improv": 5,
     "epsilon": 1.0,
     "batch_size": 64
@@ -35,7 +35,7 @@ value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 policy_net = Network(
     dims=(state_size, 32, 32, action_size), output_activation=nn.Softmax(dim=-1)
     )
-policy_optim = Adam(policy_net.parameters(), lr=1e-7, eps=1e-3)
+policy_optim = Adam(policy_net.parameters(), lr=1e-7, eps=1e-3, weight_decay=1e-4)
 
 # colours = ['#085ea8', '#5379b7', '#7e95c5', '#a5b3d4', '#cbd1e2', 
 #            '#f1cfce', '#eeadad', '#e88b8d', '#df676e', '#d43d51']
@@ -462,8 +462,8 @@ plt.ylabel("Loss")
 plt.legend()
 
 plt.tight_layout()
-# plt.savefig("policy_valid_loss.png")
-plt.show()
+plt.savefig("policy_valid_loss.png")
+# plt.show()
 
 # Plot testing losses for both policy and value networks
 plt.figure(figsize=(14, 6))
@@ -483,8 +483,8 @@ plt.ylabel("Loss")
 plt.legend()
 
 plt.tight_layout()
-# plt.savefig("policy_test_loss.png")
-plt.show()
+plt.savefig("policy_test_loss.png")
+# plt.show()
 
 # plt.plot(rl_return_list, 'c', label='RL')
 # plt.plot(gvwy_return_list, 'g', label='GVWY')
