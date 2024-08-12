@@ -17,11 +17,11 @@ import torch.nn.functional as F
 
 
 CONFIG = {
-    "total_eps": 20,
+    "total_eps": 10,
     "eval_freq": 1,
-    "train_data_eps": 100,
-    "val_data_eps": 20,
-    "eval_data_eps": 20,
+    "train_data_eps": 2100,
+    "val_data_eps": 600,
+    "eval_data_eps": 300,
     "policy_improv": 5,
     "epsilon": 1.0,
     "batch_size": 64
@@ -227,26 +227,26 @@ def train_actor_critic(
             test_policy_loss_list.append(testing_policy_loss)
             test_value_loss_list.append(testing_value_loss)
 
-            # mean_rl_return, mean_gvwy_return = eval_mean_returns(
-            #     10, value_net, market_params, 
-            #     model_path='value_net_checkpoint.pt'
-            # )
-            # rl_return_list.append(mean_rl_return)
-            # gvwy_return_list.append(mean_gvwy_return)
+            mean_rl_return, mean_gvwy_return = eval_mean_returns(
+                10000, value_net, market_params, 
+                model_path='value_net_checkpoint.pt'
+            )
+            rl_return_list.append(mean_rl_return)
+            gvwy_return_list.append(mean_gvwy_return)
 
-            # # Generate new data based on the updated policy
-            # train_obs, train_actions, train_q_values = generate_data(CONFIG['train_data_eps'],                                    
-            #   market_params=market_params,
-            #   eps_file='episode_seller.csv',
-            #   value_net=value_net, gamma=0.0
-            # )
+            # Generate new data based on the updated policy
+            train_obs, train_actions, train_q_values = generate_data(CONFIG['train_data_eps'],                                    
+              market_params=market_params,
+              eps_file='episode_seller.csv',
+              value_net=value_net, gamma=0.0
+            )
 
-            # # Update epsilon value using linear decay
-            # epsilon = linear_epsilon_decay(iteration, CONFIG['policy_improv'])
-            # market_params = list(market_params)    
-            # market_params[3]['sellers'][1][2]['epsilon'] = epsilon
-            # market_params[3]['sellers'][1][2]['value_func'] = value_net
-            # market_params = tuple(market_params)
+            # Update epsilon value using linear decay
+            epsilon = linear_epsilon_decay(iteration, CONFIG['policy_improv'])
+            market_params = list(market_params)    
+            market_params[3]['sellers'][1][2]['epsilon'] = epsilon
+            market_params[3]['sellers'][1][2]['value_func'] = value_net
+            market_params = tuple(market_params)
 
     return stats, valid_policy_loss_list, valid_value_loss_list, test_policy_loss_list, test_value_loss_list, value_net, rl_return_list, gvwy_return_list
 
@@ -432,64 +432,65 @@ stats, valid_policy_loss_list, valid_value_loss_list, test_policy_loss_list, tes
         market_params=market_params, batch_size=CONFIG["batch_size"]
     )
 
-print(f"Training Policy Loss: {stats['policy_loss']}")
-print(f"Training Value Loss: {stats['value_loss']}")
-print(f"Validation Policy Loss: {valid_policy_loss_list}")
-print(f"Validation Value Loss: {valid_value_loss_list}")
-print(f"Testing Policy Loss: {test_policy_loss_list}")
-print(f"Testing Value Loss: {test_value_loss_list}")
+# print(f"Training Policy Loss: {stats['policy_loss']}")
+# print(f"Training Value Loss: {stats['value_loss']}")
+# print(f"Validation Policy Loss: {valid_policy_loss_list}")
+# print(f"Validation Value Loss: {valid_value_loss_list}")
+# print(f"Testing Policy Loss: {test_policy_loss_list}")
+# print(f"Testing Value Loss: {test_value_loss_list}")
 # print(f"RL Returns: {rl_return_list}")
 # print(f"GVWY Returns: {gvwy_return_list}")
 
-# Plot training and validation losses for the policy network (actor)
-plt.figure(figsize=(14, 6))
+# # Plot training and validation losses for the policy network (actor)
+# plt.figure(figsize=(14, 6))
 
-plt.subplot(1, 2, 1)
-plt.plot(stats['policy_loss'], 'c', linewidth=1.0, label='Training Policy Loss')
-plt.plot(valid_policy_loss_list, 'g', linewidth=1.0, label='Validation Policy Loss')
-plt.title("Policy (Actor) Loss")
-plt.xlabel("Epoch")
-plt.ylabel("Loss")
-plt.legend()
-
-# Plot training and validation losses for the value network (critic)
-plt.subplot(1, 2, 2)
-plt.plot(stats['value_loss'], 'c', linewidth=1.0, label='Training Value Loss')
-plt.plot(valid_value_loss_list, 'g', linewidth=1.0, label='Validation Value Loss')
-plt.title("Value (Critic) Loss")
-plt.xlabel("Epoch")
-plt.ylabel("Loss")
-plt.legend()
-
-plt.tight_layout()
-plt.savefig("policy_valid_loss.png")
-# plt.show()
-
-# Plot testing losses for both policy and value networks
-plt.figure(figsize=(14, 6))
-
-plt.subplot(1, 2, 1)
-plt.plot(test_policy_loss_list, linewidth=1.0, label='Testing Policy Loss')
-plt.title("Policy (Actor) Loss - Testing Data")
-plt.xlabel("Epoch")
-plt.ylabel("Loss")
-plt.legend()
-
-plt.subplot(1, 2, 2)
-plt.plot(test_value_loss_list, linewidth=1.0, label='Testing Value Loss')
-plt.title("Value (Critic) Loss - Testing Data")
-plt.xlabel("Epoch")
-plt.ylabel("Loss")
-plt.legend()
-
-plt.tight_layout()
-plt.savefig("policy_test_loss.png")
-# plt.show()
-
-# plt.plot(rl_return_list, 'c', label='RL')
-# plt.plot(gvwy_return_list, 'g', label='GVWY')
+# plt.subplot(1, 2, 1)
+# plt.plot(stats['policy_loss'], 'c', linewidth=1.0, label='Training Policy Loss')
+# plt.plot(valid_policy_loss_list, 'g', linewidth=1.0, label='Validation Policy Loss')
+# plt.title("Policy (Actor) Loss")
+# plt.xlabel("Epoch")
+# plt.ylabel("Loss")
 # plt.legend()
-# plt.xlabel('Iterations')
-# plt.ylabel('Mean Returns')
-# plt.title('Policy Improvement')
+
+# # Plot training and validation losses for the value network (critic)
+# plt.subplot(1, 2, 2)
+# plt.plot(stats['value_loss'], 'c', linewidth=1.0, label='Training Value Loss')
+# plt.plot(valid_value_loss_list, 'g', linewidth=1.0, label='Validation Value Loss')
+# plt.title("Value (Critic) Loss")
+# plt.xlabel("Epoch")
+# plt.ylabel("Loss")
+# plt.legend()
+
+# plt.tight_layout()
+# plt.savefig("policy_valid_loss.png")
+# # plt.show()
+
+# # Plot testing losses for both policy and value networks
+# plt.figure(figsize=(14, 6))
+
+# plt.subplot(1, 2, 1)
+# plt.plot(test_policy_loss_list, linewidth=1.0, label='Testing Policy Loss')
+# plt.title("Policy (Actor) Loss - Testing Data")
+# plt.xlabel("Epoch")
+# plt.ylabel("Loss")
+# plt.legend()
+
+# plt.subplot(1, 2, 2)
+# plt.plot(test_value_loss_list, linewidth=1.0, label='Testing Value Loss')
+# plt.title("Value (Critic) Loss - Testing Data")
+# plt.xlabel("Epoch")
+# plt.ylabel("Loss")
+# plt.legend()
+
+# plt.tight_layout()
+# plt.savefig("policy_test_loss.png")
+# # plt.show()
+
+plt.plot(rl_return_list, 'c', label='RL')
+plt.plot(gvwy_return_list, 'g', label='GVWY')
+plt.legend()
+plt.xlabel('Iterations')
+plt.ylabel('Mean Returns')
+plt.title('Policy Improvement')
+plt.savefig('policy_improv_AC.png')
 # plt.show()
