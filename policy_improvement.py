@@ -21,10 +21,10 @@ import torch.nn.functional as F
 CONFIG = {
     "num_epochs": 20,
     "eval_freq": 1,
-    "train_data_eps": 3500,
-    "val_data_eps": 1000,
-    "eval_data_eps": 500,
-    "policy_improv": 50,
+    "train_data_eps": 2100,
+    "val_data_eps": 600,
+    "eval_data_eps": 300,
+    "policy_improv": 5,
     "epsilon": 1.0,
     "batch_size": 32
 }
@@ -32,8 +32,6 @@ CONFIG = {
 # Define the value function neural network
 state_size = 14
 action_size = 50
-# value_net = Network(dims=(state_size+action_size, 32, 32, 1), output_activation=None)
-# value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
 # Define market parameters
 sess_id = 'session_1'
@@ -52,7 +50,7 @@ order_interval = 60
 order_schedule = {'sup': supply_schedule, 'dem': demand_schedule,
                 'interval': order_interval, 'timemode': 'drip-fixed'}
 # 'max_order_price': supply_schedule[0]['ranges'][0][1]
-sellers_spec = [('GVWY', 4), ('REINFORCE', 1, {'epsilon': 0.8, 'max_order_price': supply_schedule[0]['ranges'][0][1]})]
+sellers_spec = [('GVWY', 4), ('REINFORCE', 1, {'epsilon': 0.97, 'max_order_price': supply_schedule[0]['ranges'][0][1]})]
 buyers_spec = [('GVWY', 5)]
 
 trader_spec = {'sellers': sellers_spec, 'buyers': buyers_spec}
@@ -72,19 +70,19 @@ for iter in range(1, CONFIG['policy_improv']+1):
 
     # Generate training data
     train_obs, train_actions, train_rewards = generate_data(CONFIG['train_data_eps'],                                    
-                market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
+                market_params=market_params, 
                 eps_file='episode_seller.csv' 
                 )
 
     # Generate validation data
     val_obs, val_actions, val_rewards = generate_data(CONFIG['val_data_eps'],                                                 
-                market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
+                market_params=market_params, 
                 eps_file='episode_seller.csv' 
                 )
 
     # Generate testing data
     test_obs, test_actions, test_rewards = generate_data(CONFIG['eval_data_eps'], 
-                market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
+                market_params=market_params, 
                 eps_file='episode_seller.csv'
                 )
 
@@ -103,8 +101,8 @@ for iter in range(1, CONFIG['policy_improv']+1):
 
     # Policy improvement
     mean_rl_return, mean_gvwy_return = eval_mean_returns(
-                num_trials=2000, value_net=value_net, 
-                market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose)
+                num_trials=200, value_net=value_net, 
+                market_params=market_params
             )
     
     print(f"EVALUATION: ITERATION {iter} - MEAN RETURN {mean_rl_return}")
@@ -113,9 +111,10 @@ for iter in range(1, CONFIG['policy_improv']+1):
 
     # Update epsilon value using linear decay
     epsilon = linear_epsilon_decay(iter, CONFIG['policy_improv'])
-    updated_market_params = list(market_params)    
-    updated_market_params[3]['sellers'][1][2]['epsilon'] = epsilon
-
+    market_params = list(market_params)    
+    market_params[3]['sellers'][1][2]['epsilon'] = epsilon
+    market_params[3]['sellers'][1][2]['value_func'] = value_net
+    market_params = tuple(market_params)
 
 # Plotting
 plt.plot(mean_returns_list, 'c', label='RL')

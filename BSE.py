@@ -2168,7 +2168,7 @@ class Reinforce(RLAgent):
         self.max_length = 0
         self.max_order_price = bse_sys_maxprice/2
         self.max_bse_price = bse_sys_maxprice
-
+        
         self.q_network = Network(dims=(self.state_size + self.action_size, 32, 32, 1))
         # self.q_network = Network(dims=(self.state_size, 32, 32, 1))
         self.value_optim = Adam(self.q_network.parameters(), lr=1e-3, eps=1e-3)
@@ -2181,7 +2181,7 @@ class Reinforce(RLAgent):
                 self.q_network.load_state_dict(params['value_func'].state_dict())
             if 'epsilon' in params:
                 self.epsilon = params['epsilon']
-
+        
         # Calculate the allowed upper bound for the profit margin
         profit_upperbound = (self.max_bse_price / self.max_order_price) - 1
         # Calculate step size based on upper bound and number of actions
