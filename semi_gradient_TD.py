@@ -69,47 +69,6 @@ verbose = False
 market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose)
 
 
-def generate_data(total_eps: int, market_params: tuple, eps_file: str) -> Tuple[List, List, List]:
-    """
-    Generates testing data by running market session total_eps times.
-
-    Args:
-        total_eps (int): Total number of times to run market session.
-        gamma (float): Discounting factor for calculating returns
-        market_params (tuple): Parameters for running market session.
-        eps_file (str): File path where the output of each market session is stored.
-
-    Returns:
-        Tuple: Normalised observations, actions, and returns (G).
-    """
-    obs_list, action_list, rewards_list = [], [], []
-
-    # Remove previous data files if they exist
-    try:
-        send2trash([eps_file])
-    except:
-        pass 
-    
-    for i in range(total_eps):
-        market_session(*market_params)
-        eps_obs, eps_actions, eps_rewards = load_episode_data(eps_file)
-        
-        obs_list.extend(eps_obs)
-        action_list.extend(eps_actions)
-        rewards_list.append(eps_rewards)
-
-    # Convert lists to numpy arrays
-    obs_array = np.array(obs_list)
-    action_array = np.array(action_list)
-
-    # Normalise observations
-    obs_mean = np.mean(obs_array, axis=0)
-    obs_std = np.std(obs_array, axis=0) + 1e-10
-    normalised_obs = (obs_array - obs_mean) / obs_std
-
-    return normalised_obs, action_array, rewards_list
-
-
 def generate_data(total_eps: int, market_params: tuple, eps_file: str, value_net, gamma: float) -> Tuple[List, List, List]:
     """
     Generates training data by running market session total_eps times.
