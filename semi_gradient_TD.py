@@ -25,7 +25,7 @@ CONFIG = {
     "eval_data_eps": 300,
     "policy_improv": 5,
     "epsilon": 1.0,
-    "batch_size": 32
+    "batch_size": 128
 }
 # Define the value function neural network
 state_size = 14
@@ -58,8 +58,8 @@ order_interval = 60
 order_schedule = {'sup': supply_schedule, 'dem': demand_schedule,
                 'interval': order_interval, 'timemode': 'drip-fixed'}
 
-sellers_spec = [('GVWY', 4), ('REINFORCE', 1, {'epsilon': 1.0, 'max_order_price': supply_schedule[0]['ranges'][0][1]})]
-buyers_spec = [('GVWY', 5)]
+sellers_spec = [('GVWY', 19), ('REINFORCE', 1, {'epsilon': 1.0, 'max_order_price': supply_schedule[0]['ranges'][0][1]})]
+buyers_spec = [('GVWY', 20)]
 
 trader_spec = {'sellers': sellers_spec, 'buyers': buyers_spec}
 
@@ -166,6 +166,7 @@ def train(
         batch_size: int=32,
     ) -> DefaultDict:
 
+    value_net.train()
     # Dictionary to store training statistics
     stats = defaultdict(list)
     valid_loss_list = []
@@ -341,6 +342,17 @@ mean_returns_list = []
 gvwy_returns_list = []
 
 for iter in range(1, CONFIG['policy_improv']+1):
+    print(f"GPI - {iter}")
+
+    # Policy improvement
+    mean_rl_return, mean_gvwy_return = eval_mean_returns(
+                num_trials=10000, value_net=value_net, 
+                market_params=market_params
+            )
+    
+    print(f"EVALUATION: ITERATION {iter} - MEAN RETURN {mean_rl_return}")
+    mean_returns_list.append(mean_rl_return)
+    gvwy_returns_list.append(mean_gvwy_return)
 
     # Generate training data
     train_obs, train_actions, train_q = generate_data(CONFIG['train_data_eps'],                                    
@@ -363,8 +375,6 @@ for iter in range(1, CONFIG['policy_improv']+1):
                 value_net=value_net, gamma=0.0
                 )
 
-    print(f"GPI - {iter}")
-
     # Policy evaluation
     stats, valid_loss_list, test_loss_list, value_net = train(
             train_obs, train_actions, train_q,
@@ -376,15 +386,6 @@ for iter in range(1, CONFIG['policy_improv']+1):
             batch_size=CONFIG["batch_size"]
         )
 
-    # Policy improvement
-    mean_rl_return, mean_gvwy_return = eval_mean_returns(
-                num_trials=5000, value_net=value_net, 
-                market_params=market_params
-            )
-    
-    print(f"EVALUATION: ITERATION {iter} - MEAN RETURN {mean_rl_return}")
-    mean_returns_list.append(mean_rl_return)
-    gvwy_returns_list.append(mean_gvwy_return)
 
     # Update epsilon value using linear decay
     epsilon = linear_epsilon_decay(iter, CONFIG['policy_improv'])
@@ -392,6 +393,16 @@ for iter in range(1, CONFIG['policy_improv']+1):
     market_params[3]['sellers'][1][2]['epsilon'] = epsilon
     market_params[3]['sellers'][1][2]['value_func'] = value_net
     market_params = tuple(market_params)
+
+    value_loss = stats['v_loss']
+    plt.plot(value_loss, 'c', linewidth=1.0, label='Training Loss')
+    plt.plot(valid_loss_list, 'g', linewidth=1.0, label='Validation Loss')
+    plt.title(f"Value Loss")
+    plt.xlabel("Epoch")
+    plt.legend()
+    plt.savefig(f"training_valid_loss_{iter}.png")
+    # plt.close()
+    # plt.show()
 
 
 # Plotting
