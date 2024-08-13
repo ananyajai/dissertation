@@ -26,7 +26,7 @@ CONFIG = {
     "eval_data_eps": 300,
     "policy_improv": 5,
     "epsilon": 1.0,
-    "batch_size": 32
+    "batch_size": 128
 }
 
 # Define the value function neural network
@@ -50,8 +50,9 @@ order_interval = 60
 order_schedule = {'sup': supply_schedule, 'dem': demand_schedule,
                 'interval': order_interval, 'timemode': 'drip-fixed'}
 # 'max_order_price': supply_schedule[0]['ranges'][0][1]
-sellers_spec = [('GVWY', 4), ('REINFORCE', 1, {'epsilon': 0.97, 'max_order_price': supply_schedule[0]['ranges'][0][1]})]
-buyers_spec = [('GVWY', 5)]
+sellers_spec = [('GVWY', 19), ('REINFORCE', 1, {'epsilon': 0.97, 'max_order_price': supply_schedule[0]['ranges'][0][1]})]
+buyers_spec = [('GVWY', 20)]
+
 
 trader_spec = {'sellers': sellers_spec, 'buyers': buyers_spec}
 
@@ -101,7 +102,7 @@ for iter in range(1, CONFIG['policy_improv']+1):
 
     # Policy improvement
     mean_rl_return, mean_gvwy_return = eval_mean_returns(
-                num_trials=200, value_net=value_net, 
+                num_trials=10000, value_net=value_net, 
                 market_params=market_params
             )
     
@@ -115,6 +116,7 @@ for iter in range(1, CONFIG['policy_improv']+1):
     market_params[3]['sellers'][1][2]['epsilon'] = epsilon
     market_params[3]['sellers'][1][2]['value_func'] = value_net
     market_params = tuple(market_params)
+
 
 # Plotting
 plt.plot(mean_returns_list, 'c', label='RL')
