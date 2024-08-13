@@ -69,7 +69,7 @@ verbose = False
 market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose)
 
 
-def generate_data(total_eps: int, market_params: tuple, eps_file: str, value_net, gamma: float) -> Tuple[List, List, List]:
+def generate_data(total_eps: int, market_params: tuple, eps_file: str, value_net, gamma: float, norm_params=None) -> Tuple[List, List, List]:
     """
     Generates training data by running market session total_eps times.
 
@@ -79,6 +79,7 @@ def generate_data(total_eps: int, market_params: tuple, eps_file: str, value_net
         eps_file (str): File path where the output of each market session is stored.
         value_net (nn.Module): The neural network model representing the Q-function.
         gamma (float): Discount factor.
+        norm_params (tuple): Normalization parameters (obs_mean, obs_std, q_mean, q_std).
 
     Returns:
         Tuple: Normalized observations, actions, and target Q-values.
@@ -90,7 +91,7 @@ def generate_data(total_eps: int, market_params: tuple, eps_file: str, value_net
         send2trash([eps_file])
     except:
         pass 
-    
+
     for i in range(total_eps):
         market_session(*market_params)
         eps_obs, eps_actions, eps_rewards = load_episode_data(eps_file)
@@ -100,16 +101,12 @@ def generate_data(total_eps: int, market_params: tuple, eps_file: str, value_net
             action = eps_actions[t]
             reward = eps_rewards[t]
 
-            # Calculate next_obs and next_action
             if t == len(eps_rewards) - 1:
-                next_obs = None
-                next_action = None
                 q_t = reward  # No next state, so Q_t = R_t
             else:
                 next_obs = eps_obs[t + 1]
                 next_action = eps_actions[t + 1]
                 
-                # Compute Q_tilda(s_t+1, a_t+1) using value_net
                 with torch.no_grad():
                     flattened_next_obs = next_obs.flatten()
                     one_hot_next_action = np.eye(action_size, dtype=int)[int(next_action)]
@@ -117,31 +114,31 @@ def generate_data(total_eps: int, market_params: tuple, eps_file: str, value_net
                     next_state_action_tensor = torch.tensor(next_state_action_pair, dtype=torch.float32).unsqueeze(0)
                     q_tilda = value_net(next_state_action_tensor).item()
                 
-                # Compute Q_t using the Bellman equation
                 q_t = reward + gamma * q_tilda
             
             obs_list.append(obs)
             action_list.append(action)
             q_list.append(q_t)
 
-    # Convert lists to numpy arrays
     obs_array = np.array(obs_list)
     action_array = np.array(action_list)
     q_array = np.array(q_list)
 
-    # Normalize observations
-    obs_mean = np.mean(obs_array, axis=0)
-    obs_std = np.std(obs_array, axis=0) + 1e-10
-    normalised_obs = (obs_array - obs_mean) / obs_std
+    # Determine normalization parameters if they aren't provided
+    if norm_params is None:
+        obs_mean = np.mean(obs_array, axis=0)
+        obs_std = np.std(obs_array, axis=0) + 1e-10
+        q_mean = np.mean(q_array)
+        q_std = np.std(q_array) + 1e-10
+        norm_params = (obs_mean, obs_std, q_mean, q_std)
+    else:
+        obs_mean, obs_std, q_mean, q_std = norm_params
 
-    # Normalize Q-values
-    q_mean = np.mean(q_array)
-    q_std = np.std(q_array) + 1e-10
+    normalised_obs = (obs_array - obs_mean) / obs_std
     normalised_q = (q_array - q_mean) / q_std
 
-    return normalised_obs, action_array, normalised_q
-
-
+    return normalised_obs, action_array, normalised_q, norm_params
+ 
 
 def load_episode_data(file: str) -> Tuple[List, List, List]:
     obs_list, action_list, reward_list = [], [], []
@@ -156,6 +153,7 @@ def load_episode_data(file: str) -> Tuple[List, List, List]:
             reward_list.append(float(row[2]))
 
     return obs_list, action_list, reward_list
+
 
 def train(
         train_obs, train_actions, train_q_values,
@@ -341,7 +339,17 @@ def eval_mean_returns(num_trials, value_net, market_params, model_path:str = 'va
 mean_returns_list = []
 gvwy_returns_list = []
 
+# Generate training data and calculate normalization parameters
+train_obs, train_actions, train_q, norm_params = generate_data(CONFIG['train_data_eps'], market_params, 'episode_seller.csv', value_net, gamma=0.0)
+
+# Generate validation data using the same normalization parameters
+val_obs, val_actions, val_q, _ = generate_data(CONFIG['val_data_eps'], market_params, 'episode_seller.csv', value_net, gamma=0.0, norm_params=norm_params)
+
+# Generate testing data using the same normalization parameters
+test_obs, test_actions, test_q, _ = generate_data(CONFIG['eval_data_eps'], market_params, 'episode_seller.csv', value_net, gamma=0.0, norm_params=norm_params)
+
 for iter in range(1, CONFIG['policy_improv']+1):
+    
     print(f"GPI - {iter}")
 
     # Policy improvement
@@ -353,27 +361,6 @@ for iter in range(1, CONFIG['policy_improv']+1):
     print(f"EVALUATION: ITERATION {iter} - MEAN RETURN {mean_rl_return}")
     mean_returns_list.append(mean_rl_return)
     gvwy_returns_list.append(mean_gvwy_return)
-
-    # Generate training data
-    train_obs, train_actions, train_q = generate_data(CONFIG['train_data_eps'],                                    
-                market_params=market_params, 
-                eps_file='episode_seller.csv',
-                value_net=value_net, gamma=0.0
-                )
-
-    # Generate validation data
-    val_obs, val_actions, val_q = generate_data(CONFIG['val_data_eps'],                                                 
-                market_params=market_params, 
-                eps_file='episode_seller.csv',
-                value_net=value_net, gamma=0.0 
-                )
-
-    # Generate testing data
-    test_obs, test_actions, test_q = generate_data(CONFIG['eval_data_eps'], 
-                market_params=market_params, 
-                eps_file='episode_seller.csv',
-                value_net=value_net, gamma=0.0
-                )
 
     # Policy evaluation
     stats, valid_loss_list, test_loss_list, value_net = train(
@@ -401,8 +388,30 @@ for iter in range(1, CONFIG['policy_improv']+1):
     plt.xlabel("Epoch")
     plt.legend()
     plt.savefig(f"training_valid_loss_{iter}.png")
-    # plt.close()
+    plt.close()
     # plt.show()
+
+    # Generate training data and calculate normalization parameters
+    train_obs, train_actions, train_q, _ = generate_data(
+        CONFIG['train_data_eps'], market_params, 
+        'episode_seller.csv', value_net, 
+        gamma=0.0, norm_params=norm_params
+    )
+
+    # Generate validation data using the same normalization parameters
+    val_obs, val_actions, val_q, _ = generate_data(
+        CONFIG['val_data_eps'], market_params, 
+        'episode_seller.csv', value_net, 
+        gamma=0.0, norm_params=norm_params
+    )
+
+    # Generate testing data using the same normalization parameters
+    test_obs, test_actions, test_q, _ = generate_data(
+        CONFIG['eval_data_eps'], market_params, 
+        'episode_seller.csv', value_net, 
+        gamma=0.0, norm_params=norm_params
+    )
+
 
 
 # Plotting
@@ -413,7 +422,7 @@ plt.xlabel('Iterations')
 plt.ylabel('Mean Returns')
 plt.title('Policy Improvement')
 plt.savefig('policy_improvement_TD.png')
-plt.show()
+# plt.show()
 
 
 # gamma_list = np.linspace(0, 1, 11)
