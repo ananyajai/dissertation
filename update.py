@@ -10,7 +10,7 @@ action_size = 50
 
 def update(
         value_net, value_optim, observations: List[np.ndarray], 
-        actions: List[int], rewards: List[float], gamma: float
+        actions: List[int], rewards: List[float]
         ) -> Dict[str, float]:
         # Initialise loss and returns
         v_loss = 0
