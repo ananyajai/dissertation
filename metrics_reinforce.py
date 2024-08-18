@@ -10,7 +10,6 @@ from epsilon_scheduling import linear_epsilon_decay
 from early_stopping import EarlyStopping
 from update import update
 from normalise import normalise_returns, normalise_obs
-import math
 
 from neural_network import Network
 import torch
@@ -29,6 +28,8 @@ CONFIG = {
     "batch_size": 32
 }
 
+
+
 colours = ['#03045e','#085ea8', '#7e95c5', '#eeadad', '#df676e', '#d43d51']
 five_colours = ['#03045e','#085ea8', '#7e95c5', '#eeadad', '#d43d51']
 mb = '#085ea8'
@@ -43,7 +44,7 @@ action_size = 50
 # Define market parameters
 sess_id = 'session_1'
 start_time = 0.0
-end_time = 60.0
+end_time = 180.0
 
 # range1 = (50, 100)
 # range2 = (100, 150)
@@ -57,7 +58,7 @@ supply_schedule = [{'from': start_time, 'to': end_time, 'ranges': [range2], 'ste
 demand_schedule = supply_schedule
 
 # new customer orders arrive at each trader approx once every order_interval seconds
-order_interval = 60
+order_interval = 30
 
 order_schedule = {'sup': supply_schedule, 'dem': demand_schedule,
                 'interval': order_interval, 'timemode': 'drip-fixed'}
@@ -76,7 +77,7 @@ def generate_data(
         total_eps: int, market_params: tuple, eps_file: str, norm_params=None
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Tuple]:
     """
-    Generates testing data by running market session total_eps times.
+    Generates data by running market session total_eps times.
 
     Args:
         total_eps (int): Total number of times to run market session.
@@ -439,9 +440,9 @@ fig_testing.tight_layout()
 # fig_validation.tight_layout()
 
 # # Save figures
-fig_training.savefig("train_valid_loss_gammas.png")
+fig_training.savefig("train_valid_loss_tradwinds.png")
 # # fig_returns.savefig("mean_return_gammas.png")
-fig_testing.savefig("testing_loss_gammas.png")
+fig_testing.savefig("testing_loss_tradwinds.png")
 # # fig_validation.savefig("validation_loss_gammas.png")
 
 # plt.show()
