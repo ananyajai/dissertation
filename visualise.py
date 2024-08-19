@@ -1,19 +1,19 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-def visualise_training_data(train_obs, train_actions, train_rewards):
+def visualise_data(obs, actions, rewards):
     """
     Visualises the distribution of features in the observations, 
     actions, and rewards from the training data.
 
     Args:
-        train_obs (List[List[np.ndarray]]): A list of episodes, where 
+        obs (List[List[np.ndarray]]): A list of episodes, where 
             each episode is a list of observations.
         
-        train_actions (List[List[int]]): A list of episodes, where each 
+        actions (List[List[int]]): A list of episodes, where each 
             episode is a list of actions taken during the episode.
         
-        train_rewards (List[List[float]]): A list of episodes, where each 
+        rewards (List[List[float]]): A list of episodes, where each 
             episode is a list of rewards received during the episode.
 
     Returns: 
@@ -21,9 +21,9 @@ def visualise_training_data(train_obs, train_actions, train_rewards):
     """
 
     # Flatten the data from all episodes into single lists
-    flat_obs = np.concatenate([np.array(episode) for episode in train_obs], axis=0)
-    flat_actions = np.concatenate([np.array(episode) for episode in train_actions], axis=0)
-    flat_rewards = np.concatenate([np.array(episode) for episode in train_rewards], axis=0)
+    flat_obs = np.concatenate([np.array(episode) for episode in obs], axis=0)
+    flat_actions = np.concatenate([np.array(episode) for episode in actions], axis=0)
+    flat_rewards = np.concatenate([np.array(episode) for episode in rewards], axis=0)
 
     # Determine the number of features and unique actions
     n_features = flat_obs.shape[1]
