@@ -10,6 +10,7 @@ from epsilon_scheduling import linear_epsilon_decay
 from early_stopping import EarlyStopping
 from update import update
 from normalise import normalise_returns, normalise_obs
+from visualise import visualise_data
 
 from neural_network import Network
 import torch
@@ -20,15 +21,13 @@ import torch.nn.functional as F
 CONFIG = {
     "total_eps": 50,
     "eval_freq": 1,
-    "train_data_eps": 3500,
-    "val_data_eps": 1000,
-    "eval_data_eps": 500,
+    "train_data_eps": 500,
+    "val_data_eps": 0,
+    "eval_data_eps": 0,
     "gamma": 0.8,
     "epsilon": 1.0,
     "batch_size": 32
 }
-
-
 
 colours = ['#03045e','#085ea8', '#7e95c5', '#eeadad', '#df676e', '#d43d51']
 five_colours = ['#03045e','#085ea8', '#7e95c5', '#eeadad', '#d43d51']
@@ -44,26 +43,26 @@ action_size = 50
 # Define market parameters
 sess_id = 'session_1'
 start_time = 0.0
-end_time = 180.0
+end_time = 60.0
 
-# range1 = (50, 100)
-# range2 = (100, 150)
-# supply_schedule = [{'from': start_time, 'to': 20.0, 'ranges': [range1], 'stepmode': 'fixed'},
-#                    {'from': 20.0, 'to': 40.0, 'ranges': [range2], 'stepmode': 'fixed'},
-#                    {'from': 40.0, 'to': end_time, 'ranges': [range1], 'stepmode': 'fixed'}]
+range1 = (50, 100)
+range2 = (100, 150)
+supply_schedule = [{'from': start_time, 'to': 20.0, 'ranges': [range1], 'stepmode': 'fixed'},
+                   {'from': 20.0, 'to': 40.0, 'ranges': [range2], 'stepmode': 'fixed'},
+                   {'from': 40.0, 'to': end_time, 'ranges': [range1], 'stepmode': 'fixed'}]
 
-range2 = (50, 150)
-supply_schedule = [{'from': start_time, 'to': end_time, 'ranges': [range2], 'stepmode': 'fixed'}]
+# range2 = (50, 150)
+# supply_schedule = [{'from': start_time, 'to': end_time, 'ranges': [range2], 'stepmode': 'fixed'}]
 
 demand_schedule = supply_schedule
 
 # new customer orders arrive at each trader approx once every order_interval seconds
-order_interval = 30
+order_interval = 60
 
 order_schedule = {'sup': supply_schedule, 'dem': demand_schedule,
                 'interval': order_interval, 'timemode': 'drip-fixed'}
 
-sellers_spec = [('GVWY', 9), ('REINFORCE', 1, {'epsilon': 1.0, 'max_order_price': supply_schedule[0]['ranges'][0][1]})]
+sellers_spec = [('GVWY', 9), ('REINFORCE', 1, {'epsilon': 1.0})]
 buyers_spec = [('GVWY', 10)]
 
 trader_spec = {'sellers': sellers_spec, 'buyers': buyers_spec}
@@ -107,6 +106,7 @@ def generate_data(
         action_list.append(eps_actions)
         rewards_list.append(eps_rewards)
 
+    # visualise_data(obs_list, action_list, rewards_list)
     # Normalise observations
     normalised_obs, obs_norm_params = normalise_obs(obs_list, norm_params)
 
@@ -312,6 +312,7 @@ test_obs, test_actions, test_rewards, _ = generate_data(CONFIG['eval_data_eps'],
               eps_file='episode_seller.csv', norm_params=obs_norm_params
               )
 
+
 # # Calculate returns
 # train_G, G_norm_params = calculate_returns(train_rewards, gamma=0.4)
 # val_G, _ = calculate_returns(val_rewards, gamma=0.4, norm_params=G_norm_params)
@@ -440,9 +441,9 @@ fig_testing.tight_layout()
 # fig_validation.tight_layout()
 
 # # Save figures
-fig_training.savefig("train_valid_loss_tradwinds.png")
+fig_training.savefig("train_valid_loss_shift.png")
 # # fig_returns.savefig("mean_return_gammas.png")
-fig_testing.savefig("testing_loss_tradwinds.png")
+fig_testing.savefig("testing_loss_shift.png")
 # # fig_validation.savefig("validation_loss_gammas.png")
 
 # plt.show()

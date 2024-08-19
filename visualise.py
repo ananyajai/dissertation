@@ -30,15 +30,15 @@ def visualise_data(obs, actions, rewards):
     n_actions = len(np.unique(flat_actions))
 
     # Create a figure with subplots
-    fig, axes = plt.subplots(nrows=4, ncols=4, figsize=(15, 15))
+    fig, axes = plt.subplots(nrows=4, ncols=4, figsize=(20, 20))
     axes = axes.flatten()
 
     # Feature labels (you can adjust these as per your specific features)
     feature_labels = [
-        "Time", "Order", "N Buyers", "N Sellers", 
+        "Time", "Order Price", "Number of Buyers", "Number of Sellers", 
         "Best Bid", "Best Ask", "Worst Bid", "Worst Ask", 
-        "Avg Bid", "Avg Ask", "Var Bid", "Var Ask",
-        "Avg Trade Price", "Trade Price MA"
+        "Average Bid", "Average Ask", "Variance Bid", "Variance Ask",
+        "Average Trade Price", "Trade Price MA"
     ]
 
     # Plot each feature of the observations
@@ -48,9 +48,9 @@ def visualise_data(obs, actions, rewards):
         axes[i].set_ylabel("Frequency")
 
     # Plot actions
-    axes[n_features].hist(flat_actions, bins=np.arange(n_actions + 1) - 0.5, rwidth=0.8, color='#085ea8', edgecolor='#03045e')
+    axes[n_features].hist(flat_actions, bins=np.arange(n_actions + 1) - 0.5, rwidth=0.8, color='#085ea8')
     axes[n_features].set_title("Actions")
-    axes[n_features].set_xticks(range(n_actions))
+    # axes[n_features].set_xticks(range(n_actions))
     axes[n_features].set_ylabel("Frequency")
 
     # Plot histogram for rewards
