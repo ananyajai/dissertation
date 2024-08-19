@@ -19,15 +19,20 @@ import torch.nn.functional as F
 
 
 CONFIG = {
-    "num_epochs": 20,
+    "num_epochs": 10,
     "eval_freq": 1,
-    "train_data_eps": 2100,
-    "val_data_eps": 600,
-    "eval_data_eps": 300,
+    "train_data_eps": 5000,
+    "val_data_eps": 100,
+    "eval_data_eps": 100,
     "policy_improv": 10,
     "epsilon": 1.0,
     "batch_size": 64
 }
+
+colours = ['#03045e','#085ea8', '#7e95c5', '#eeadad', '#df676e', '#d43d51']
+five_colours = ['#03045e','#085ea8', '#7e95c5', '#eeadad', '#d43d51']
+mb = '#085ea8'
+mp = '#eeadad'
 
 # Define the value function neural network
 state_size = 14
@@ -50,8 +55,8 @@ order_interval = 60
 order_schedule = {'sup': supply_schedule, 'dem': demand_schedule,
                 'interval': order_interval, 'timemode': 'drip-fixed'}
 # 'max_order_price': supply_schedule[0]['ranges'][0][1]
-sellers_spec = [('GVWY', 19), ('REINFORCE', 1, {'epsilon': 0.97, 'max_order_price': supply_schedule[0]['ranges'][0][1]})]
-buyers_spec = [('GVWY', 20)]
+sellers_spec = [('GVWY', 9), ('REINFORCE', 1, {'epsilon': 0.97, 'max_order_price': supply_schedule[0]['ranges'][0][1]})]
+buyers_spec = [('ZIC', 10)]
 
 
 trader_spec = {'sellers': sellers_spec, 'buyers': buyers_spec}
@@ -63,13 +68,11 @@ market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_
 
 mean_returns_list = []
 gvwy_returns_list = []
+zic_returns_list = []
 
-value_net = Network(dims=(state_size+action_size, 32, 32, 1), output_activation=None)
+value_net = Network(dims=(state_size+action_size, 32, 32, 32, 1), output_activation=None)
 value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
-# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# # Set the device for the neural network
-# value_net.to(device)
 
 # Generate training data and normalization parameters
 train_obs, train_actions, train_rewards, obs_norm_params = generate_data(
@@ -95,23 +98,32 @@ test_obs, test_actions, test_rewards, _ = generate_data(
 )
 
 # Calculate returns
-train_G, G_norm_params = calculate_returns(train_rewards, gamma=0.4)
-val_G, _ = calculate_returns(val_rewards, gamma=0.4, norm_params=G_norm_params)
-test_G, _ = calculate_returns(test_rewards, gamma=0.4, norm_params=G_norm_params)
+train_G, G_norm_params = calculate_returns(train_rewards, gamma=1.0)
+val_G, _ = calculate_returns(val_rewards, gamma=1.0, norm_params=G_norm_params)
+test_G, _ = calculate_returns(test_rewards, gamma=1.0, norm_params=G_norm_params)
 
 
 for iter in range(1, CONFIG['policy_improv']+1):
     print(f"GPI - {iter}")
 
-    # Policy improvement
-    mean_rl_return, mean_gvwy_return = eval_mean_returns(
-                num_trials=20000, value_net=value_net, 
-                market_params=market_params
-            )
+    # # Plot the distribution of actions
+    # flat_actions = [a for actions in train_actions for a in actions]
+    # plt.hist(flat_actions, bins=action_size, color=mp, alpha=0.9, label='Actions')
+    # plt.title(f"Actions Distribution")
+    # plt.xlabel("Actions")
+    # plt.ylabel("Frequency")
+    # plt.show()
+
+    # # Policy improvement
+    # mean_rl_return, mean_gvwy_return, mean_zic_return = eval_mean_returns(
+    #             num_trials=50, value_net=value_net, 
+    #             market_params=market_params
+    #         )
     
-    print(f"EVALUATION: ITERATION {iter} - MEAN RETURN {mean_rl_return}")
-    mean_returns_list.append(mean_rl_return)
-    gvwy_returns_list.append(mean_gvwy_return)
+    # print(f"EVALUATION: ITERATION {iter} - MEAN RETURN {mean_rl_return}")
+    # mean_returns_list.append(mean_rl_return)
+    # gvwy_returns_list.append(mean_gvwy_return)
+    # zic_returns_list.append(mean_zic_return)
 
     # Policy evaluation
     stats, valid_loss_list, test_loss_list, value_net = train(
@@ -131,15 +143,15 @@ for iter in range(1, CONFIG['policy_improv']+1):
     market_params[3]['sellers'][1][2]['value_func'] = value_net
     market_params = tuple(market_params)
 
-    value_loss = stats['v_loss']
-    plt.plot(value_loss, '#085ea8', linewidth=1.0, label='Training Loss')
-    plt.plot(valid_loss_list, '#d43d51', linewidth=1.0, label='Validation Loss')
-    plt.title(f"Value Loss")
-    plt.xlabel("Epoch")
-    plt.legend()
-    plt.savefig('value_loss_{iter}.png')
-    plt.close()
-    # plt.show()
+    # value_loss = stats['v_loss']
+    # plt.plot(value_loss, mb, linewidth=1.0, label='Training Loss')
+    # plt.plot(valid_loss_list, mp, linewidth=1.0, label='Validation Loss')
+    # plt.title(f"Value Loss")
+    # plt.xlabel("Epoch")
+    # plt.legend()
+    # plt.savefig(f'value_loss_{iter}.png')
+    # plt.close()
+    # # plt.show()
 
     # Generate training data
     train_obs, train_actions, train_rewards, _ = generate_data(
@@ -166,20 +178,21 @@ for iter in range(1, CONFIG['policy_improv']+1):
     )
 
     # Calculate returns
-    train_G, _ = calculate_returns(train_rewards, gamma=0.4, norm_params=G_norm_params)
-    val_G, _ = calculate_returns(val_rewards, gamma=0.4, norm_params=G_norm_params)
-    test_G, _ = calculate_returns(test_rewards, gamma=0.4, norm_params=G_norm_params)
+    train_G, _ = calculate_returns(train_rewards, gamma=1.0, norm_params=G_norm_params)
+    val_G, _ = calculate_returns(val_rewards, gamma=1.0, norm_params=G_norm_params)
+    test_G, _ = calculate_returns(test_rewards, gamma=1.0, norm_params=G_norm_params)
 
 
 
-# Plotting
-plt.plot(mean_returns_list, 'c', label='RL')
-plt.plot(gvwy_returns_list, 'g', label='GVWY')
-plt.legend()
-plt.xlabel('Iterations')
-plt.ylabel('Mean Returns')
-plt.title('Policy Improvement')
-plt.savefig('policy_improvement.png')
+# # Plotting
+# plt.plot(mean_returns_list, mb, label='RL')
+# plt.plot(gvwy_returns_list, mp, label='GVWY')
+# plt.plot(zic_returns_list, '#03045e', label='ZIC')
+# plt.legend()
+# plt.xlabel('Iterations')
+# plt.ylabel('Mean Returns')
+# plt.title('Policy Improvement')
+# # plt.savefig('policy_improvement.png')
 # plt.show()
 
 
