@@ -73,7 +73,7 @@ verbose = False
 market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose)
 
 def generate_data(
-        total_eps: int, market_params: tuple, eps_file: str, norm_params=None
+        total_eps: int, market_params: tuple, eps_file: str, iter, norm_params=None
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Tuple]:
     """
     Generates data by running market session total_eps times.
@@ -105,8 +105,7 @@ def generate_data(
         obs_list.append(eps_obs)
         action_list.append(eps_actions)
         rewards_list.append(eps_rewards)
-        
-    iter = 0
+
     if total_eps > 10:
         # Define your price ranges
         price_ranges = [(50, 70), (71, 90), (91, 110), (111, 130), (131, 150)]
@@ -134,7 +133,7 @@ def generate_data(
 
         plt.tight_layout()
         plt.savefig(f"actions_dist_iter_{iter}.png")
-        iter += 1
+        plt.close()
 
     # visualise_data(obs_list, action_list, rewards_list)
     # Normalise observations

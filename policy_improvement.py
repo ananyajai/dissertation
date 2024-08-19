@@ -73,12 +73,12 @@ zic_returns_list = []
 value_net = Network(dims=(state_size+action_size, 32, 32, 32, 1), output_activation=None)
 value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
-
 # Generate training data and normalization parameters
 train_obs, train_actions, train_rewards, obs_norm_params = generate_data(
     total_eps=CONFIG['train_data_eps'], 
     market_params=market_params, 
-    eps_file='episode_seller.csv'
+    eps_file='episode_seller.csv',
+    iter=0
 )
 
 # Generate validation data using training normalization parameters
@@ -86,6 +86,7 @@ val_obs, val_actions, val_rewards, _ = generate_data(
     total_eps=CONFIG['val_data_eps'], 
     market_params=market_params, 
     eps_file='episode_seller.csv',
+    iter=0,
     norm_params=obs_norm_params  # Use the normalization parameters from training
 )
 
@@ -94,6 +95,7 @@ test_obs, test_actions, test_rewards, _ = generate_data(
     total_eps=CONFIG['eval_data_eps'], 
     market_params=market_params, 
     eps_file='episode_seller.csv',
+    iter=0,
     norm_params=obs_norm_params  # Use the normalization parameters from training
 )
 
@@ -158,6 +160,7 @@ for iter in range(1, CONFIG['policy_improv']+1):
         total_eps=CONFIG['train_data_eps'], 
         market_params=market_params, 
         eps_file='episode_seller.csv',
+        iter=iter,
         norm_params=obs_norm_params  # Use the normalization parameters from training
     )
 
@@ -166,6 +169,7 @@ for iter in range(1, CONFIG['policy_improv']+1):
         total_eps=CONFIG['val_data_eps'], 
         market_params=market_params, 
         eps_file='episode_seller.csv',
+        iter=iter,
         norm_params=obs_norm_params  # Use the normalization parameters from training
     )
 
@@ -174,6 +178,7 @@ for iter in range(1, CONFIG['policy_improv']+1):
         total_eps=CONFIG['eval_data_eps'], 
         market_params=market_params, 
         eps_file='episode_seller.csv',
+        iter=iter,
         norm_params=obs_norm_params  # Use the normalization parameters from training
     )
 
