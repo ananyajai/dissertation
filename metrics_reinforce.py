@@ -73,7 +73,7 @@ verbose = False
 market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose)
 
 def generate_data(
-        total_eps: int, market_params: tuple, eps_file: str, norm_params=None
+        total_eps: int, market_params: tuple, eps_file: str, norm_params:tuple=None
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Tuple]:
     """
     Generates data by running market session total_eps times.
@@ -94,9 +94,12 @@ def generate_data(
         send2trash([eps_file])
     except:
         pass 
+
+    updated_market_params = list(market_params)    
+    updated_market_params[3]['sellers'][1][2]['norm_params'] = norm_params
     
     for i in range(total_eps):
-        market_session(*market_params)
+        market_session(*updated_market_params)
         eps_obs, eps_actions, eps_rewards = load_episode_data(eps_file)
 
         if len(eps_obs) == 0:
@@ -107,13 +110,27 @@ def generate_data(
         rewards_list.append(eps_rewards)
 
     # visualise_data(obs_list, action_list, rewards_list)
-    # Normalise observations
-    normalised_obs, obs_norm_params = normalise_obs(obs_list, norm_params)
 
-    return normalised_obs, action_list, rewards_list, obs_norm_params
+    return obs_list, action_list, rewards_list
 
 
-def calculate_returns(rewards: List[List[float]], gamma: float, norm_params=None) -> List[float]:
+def calculate_returns(
+        rewards: List[List[float]], gamma: float, norm_params=None
+    ) -> List[float]:
+    """
+    Calculate the returns (discounted cumulative rewards) for each episode.
+
+    Args:
+        rewards (List[List[float]]): A list of episodes, where each episode is a list of rewards.
+        gamma (float): The discount factor, between 0 and 1, that represents the value of future rewards.
+        norm_params (Optional[Tuple[float, float]]): Normalisation parameters (mean and std) to normalise the returns.
+                                                    If None, the function will compute and use them.
+
+    Returns:
+        Tuple[List[List[float]], Tuple[float, float]]: 
+            - A list of episodes, where each episode is a list of normalised returns.
+            - A tuple containing the mean and standard deviation used for normalisation.
+    """
     G_list = []
     for eps_rewards in rewards:
         if len(eps_rewards) > 0:

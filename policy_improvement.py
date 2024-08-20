@@ -10,6 +10,7 @@ from epsilon_scheduling import linear_epsilon_decay
 from early_stopping import EarlyStopping
 from update import update
 from metrics_reinforce import train, generate_data, eval_mean_returns, calculate_returns
+from normalise import normalise_obs
 
 from neural_network import Network
 import torch
@@ -19,12 +20,12 @@ import torch.nn.functional as F
 
 
 CONFIG = {
-    "num_epochs": 10,
+    "num_epochs": 20,
     "eval_freq": 1,
-    "train_data_eps": 1400,
-    "val_data_eps": 400,
-    "eval_data_eps": 200,
-    "policy_improv": 5,
+    "train_data_eps": 2100,
+    "val_data_eps": 600,
+    "eval_data_eps": 300,
+    "policy_improv": 10,
     "epsilon": 1.0,
     "batch_size": 64
 }
@@ -74,27 +75,34 @@ value_net = Network(dims=(state_size+action_size, 32, 32, 32, 1), output_activat
 value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
 # Generate training data and normalization parameters
-train_obs, train_actions, train_rewards, obs_norm_params = generate_data(
+train_obs, train_actions, train_rewards = generate_data(
     total_eps=CONFIG['train_data_eps'], 
     market_params=market_params, 
     eps_file='episode_seller.csv'
 )
 
 # Generate validation data using training normalization parameters
-val_obs, val_actions, val_rewards, _ = generate_data(
+val_obs, val_actions, val_rewards = generate_data(
     total_eps=CONFIG['val_data_eps'], 
     market_params=market_params, 
-    eps_file='episode_seller.csv',
-    norm_params=obs_norm_params  # Use the normalization parameters from training
+    eps_file='episode_seller.csv'
 )
 
 # Generate test data using training normalization parameters
-test_obs, test_actions, test_rewards, _ = generate_data(
+test_obs, test_actions, test_rewards = generate_data(
     total_eps=CONFIG['eval_data_eps'], 
     market_params=market_params, 
-    eps_file='episode_seller.csv',
-    norm_params=obs_norm_params  # Use the normalization parameters from training
+    eps_file='episode_seller.csv'
 )
+
+# Normalise training observations
+train_obs, obs_norm_params = normalise_obs(train_obs)
+
+# Normalise validation observations
+val_obs, _ = normalise_obs(val_obs, obs_norm_params)
+
+# Normalise testing observations
+test_obs, _ = normalise_obs(test_obs, obs_norm_params)
 
 # Calculate returns
 train_G, G_norm_params = calculate_returns(train_rewards, gamma=1.0)
@@ -146,36 +154,45 @@ for iter in range(1, CONFIG['policy_improv']+1):
     value_loss = stats['v_loss']
     plt.plot(value_loss, mb, linewidth=1.0, label='Training Loss')
     plt.plot(valid_loss_list, mp, linewidth=1.0, label='Validation Loss')
-    # plt.title(f"Value Loss")
+    plt.title(f"Value Loss - Iteration {iter}")
     plt.xlabel("Epoch")
     plt.legend()
     plt.savefig(f'value_loss_{iter}.png')
     plt.close()
     # plt.show()
 
-    # Generate training data
-    train_obs, train_actions, train_rewards, _ = generate_data(
+    # Generate training data and normalization parameters
+    train_obs, train_actions, train_rewards = generate_data(
         total_eps=CONFIG['train_data_eps'], 
         market_params=market_params, 
         eps_file='episode_seller.csv',
-        norm_params=obs_norm_params  # Use the normalization parameters from training
+        norm_params=obs_norm_params
     )
 
-    # Generate validation data
-    val_obs, val_actions, val_rewards, _ = generate_data(
+    # Generate validation data using training normalization parameters
+    val_obs, val_actions, val_rewards = generate_data(
         total_eps=CONFIG['val_data_eps'], 
         market_params=market_params, 
         eps_file='episode_seller.csv',
         norm_params=obs_norm_params  # Use the normalization parameters from training
     )
 
-    # Generate test data
-    test_obs, test_actions, test_rewards, _ = generate_data(
+    # Generate test data using training normalization parameters
+    test_obs, test_actions, test_rewards = generate_data(
         total_eps=CONFIG['eval_data_eps'], 
         market_params=market_params, 
         eps_file='episode_seller.csv',
         norm_params=obs_norm_params  # Use the normalization parameters from training
     )
+
+    # Normalise training observations
+    train_obs, obs_norm_params = normalise_obs(train_obs)
+
+    # Normalise validation observations
+    val_obs, _ = normalise_obs(val_obs, obs_norm_params)
+
+    # Normalise testing observations
+    test_obs, _ = normalise_obs(test_obs, obs_norm_params)
 
     # Calculate returns
     train_G, _ = calculate_returns(train_rewards, gamma=1.0, norm_params=G_norm_params)

@@ -2229,6 +2229,9 @@ class Reinforce(RLAgent):
         Normalises the current state using the mean and 
         standard deviation of the training data.
         """
+        if self.norm_params is None:
+            return state
+        
         mean, std = self.norm_params
         return (state - mean) / std
 
