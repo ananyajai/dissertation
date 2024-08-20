@@ -21,10 +21,10 @@ import torch.nn.functional as F
 CONFIG = {
     "num_epochs": 10,
     "eval_freq": 1,
-    "train_data_eps": 5000,
-    "val_data_eps": 100,
-    "eval_data_eps": 100,
-    "policy_improv": 10,
+    "train_data_eps": 1400,
+    "val_data_eps": 400,
+    "eval_data_eps": 200,
+    "policy_improv": 5,
     "epsilon": 1.0,
     "batch_size": 64
 }
@@ -77,8 +77,7 @@ value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 train_obs, train_actions, train_rewards, obs_norm_params = generate_data(
     total_eps=CONFIG['train_data_eps'], 
     market_params=market_params, 
-    eps_file='episode_seller.csv',
-    iter=0
+    eps_file='episode_seller.csv'
 )
 
 # Generate validation data using training normalization parameters
@@ -86,7 +85,6 @@ val_obs, val_actions, val_rewards, _ = generate_data(
     total_eps=CONFIG['val_data_eps'], 
     market_params=market_params, 
     eps_file='episode_seller.csv',
-    iter=0,
     norm_params=obs_norm_params  # Use the normalization parameters from training
 )
 
@@ -95,7 +93,6 @@ test_obs, test_actions, test_rewards, _ = generate_data(
     total_eps=CONFIG['eval_data_eps'], 
     market_params=market_params, 
     eps_file='episode_seller.csv',
-    iter=0,
     norm_params=obs_norm_params  # Use the normalization parameters from training
 )
 
@@ -116,16 +113,17 @@ for iter in range(1, CONFIG['policy_improv']+1):
     # plt.ylabel("Frequency")
     # plt.show()
 
-    # # Policy improvement
-    # mean_rl_return, mean_gvwy_return, mean_zic_return = eval_mean_returns(
-    #             num_trials=50, value_net=value_net, 
-    #             market_params=market_params
-    #         )
+    # Policy improvement
+    mean_rl_return, mean_gvwy_return, mean_zic_return = eval_mean_returns(
+                num_trials=10000, value_net=value_net, 
+                market_params=market_params,
+                norm_params=obs_norm_params
+            )
     
-    # print(f"EVALUATION: ITERATION {iter} - MEAN RETURN {mean_rl_return}")
-    # mean_returns_list.append(mean_rl_return)
-    # gvwy_returns_list.append(mean_gvwy_return)
-    # zic_returns_list.append(mean_zic_return)
+    print(f"EVALUATION: ITERATION {iter} - MEAN RETURN {mean_rl_return}")
+    mean_returns_list.append(mean_rl_return)
+    gvwy_returns_list.append(mean_gvwy_return)
+    zic_returns_list.append(mean_zic_return)
 
     # Policy evaluation
     stats, valid_loss_list, test_loss_list, value_net = train(
@@ -145,22 +143,21 @@ for iter in range(1, CONFIG['policy_improv']+1):
     market_params[3]['sellers'][1][2]['value_func'] = value_net
     market_params = tuple(market_params)
 
-    # value_loss = stats['v_loss']
-    # plt.plot(value_loss, mb, linewidth=1.0, label='Training Loss')
-    # plt.plot(valid_loss_list, mp, linewidth=1.0, label='Validation Loss')
+    value_loss = stats['v_loss']
+    plt.plot(value_loss, mb, linewidth=1.0, label='Training Loss')
+    plt.plot(valid_loss_list, mp, linewidth=1.0, label='Validation Loss')
     # plt.title(f"Value Loss")
-    # plt.xlabel("Epoch")
-    # plt.legend()
-    # plt.savefig(f'value_loss_{iter}.png')
-    # plt.close()
-    # # plt.show()
+    plt.xlabel("Epoch")
+    plt.legend()
+    plt.savefig(f'value_loss_{iter}.png')
+    plt.close()
+    # plt.show()
 
     # Generate training data
     train_obs, train_actions, train_rewards, _ = generate_data(
         total_eps=CONFIG['train_data_eps'], 
         market_params=market_params, 
         eps_file='episode_seller.csv',
-        iter=iter,
         norm_params=obs_norm_params  # Use the normalization parameters from training
     )
 
@@ -169,7 +166,6 @@ for iter in range(1, CONFIG['policy_improv']+1):
         total_eps=CONFIG['val_data_eps'], 
         market_params=market_params, 
         eps_file='episode_seller.csv',
-        iter=iter,
         norm_params=obs_norm_params  # Use the normalization parameters from training
     )
 
@@ -178,7 +174,6 @@ for iter in range(1, CONFIG['policy_improv']+1):
         total_eps=CONFIG['eval_data_eps'], 
         market_params=market_params, 
         eps_file='episode_seller.csv',
-        iter=iter,
         norm_params=obs_norm_params  # Use the normalization parameters from training
     )
 
@@ -189,15 +184,15 @@ for iter in range(1, CONFIG['policy_improv']+1):
 
 
 
-# # Plotting
-# plt.plot(mean_returns_list, mb, label='RL')
-# plt.plot(gvwy_returns_list, mp, label='GVWY')
-# plt.plot(zic_returns_list, '#03045e', label='ZIC')
-# plt.legend()
-# plt.xlabel('Iterations')
-# plt.ylabel('Mean Returns')
-# plt.title('Policy Improvement')
-# # plt.savefig('policy_improvement.png')
+# Plotting
+plt.plot(mean_returns_list, mb, label='RL')
+plt.plot(gvwy_returns_list, mp, label='GVWY')
+plt.plot(zic_returns_list, '#03045e', label='ZIC')
+plt.legend()
+plt.xlabel('Iterations')
+plt.ylabel('Mean Returns')
+plt.title('Policy Improvement')
+plt.savefig('policy_improvement.png')
 # plt.show()
 
 

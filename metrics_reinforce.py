@@ -73,7 +73,7 @@ verbose = False
 market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose)
 
 def generate_data(
-        total_eps: int, market_params: tuple, eps_file: str, iter, norm_params=None
+        total_eps: int, market_params: tuple, eps_file: str, norm_params=None
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Tuple]:
     """
     Generates data by running market session total_eps times.
@@ -105,35 +105,6 @@ def generate_data(
         obs_list.append(eps_obs)
         action_list.append(eps_actions)
         rewards_list.append(eps_rewards)
-
-    if total_eps > 10:
-        # Define your price ranges
-        price_ranges = [(50, 70), (71, 90), (91, 110), (111, 130), (131, 150)]
-
-        # Initialise lists to hold actions for each price range
-        range_actions = [[] for _ in range(len(price_ranges))]
-
-        # Flatten actions and separate them based on price ranges
-        for episode_obs, episode_actions in zip(obs_list, action_list):
-            for obs, action in zip(episode_obs, episode_actions):
-                price = obs[1]  # Assuming the second element in observation is the order price
-                for i, (low, high) in enumerate(price_ranges):
-                    if low <= price < high:
-                        range_actions[i].append(action)
-                        break
-
-        # Plot histograms for each price range
-        fig, axs = plt.subplots(1, 5, figsize=(20, 4))
-
-        for i, (low, high) in enumerate(price_ranges):
-            axs[i].hist(range_actions[i], bins=action_size, color=five_colours[i], alpha=0.8)
-            axs[i].set_title(f"Price Range: {low}-{high}")
-            axs[i].set_xlabel("Actions")
-            axs[i].set_ylabel("Frequency")
-
-        plt.tight_layout()
-        plt.savefig(f"actions_dist_iter_{iter}.png")
-        plt.close()
 
     # visualise_data(obs_list, action_list, rewards_list)
     # Normalise observations
@@ -274,7 +245,7 @@ def evaluate(
     return average_loss
 
 
-def eval_mean_returns(num_trials, value_net, market_params, model_path:str = 'value_net_checkpoint.pt'):
+def eval_mean_returns(num_trials, value_net, market_params, norm_params:tuple=(0, 1), model_path:str = 'value_net_checkpoint.pt'):
     # value_net.load_state_dict(torch.load(model_path))
     value_net.eval()
 
@@ -287,6 +258,7 @@ def eval_mean_returns(num_trials, value_net, market_params, model_path:str = 'va
     updated_market_params = list(market_params)    
     updated_market_params[3]['sellers'][1][2]['value_func'] = value_net
     updated_market_params[3]['sellers'][1][2]['epsilon'] = 0.0         # No exploring
+    updated_market_params[3]['sellers'][1][2]['norm_params'] = norm_params
 
     # for trial in range(num_trials):
     for trial in range(1, num_trials + 1):

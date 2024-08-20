@@ -2180,6 +2180,8 @@ class Reinforce(RLAgent):
                 self.q_network.load_state_dict(params['value_func'].state_dict())
             if 'epsilon' in params:
                 self.epsilon = params['epsilon']
+            if 'norm_params' in params:
+                self.norm_params = params['norm_params']
         
         # Calculate the allowed upper bound for the profit margin
         profit_upperbound = (self.max_bse_price / self.max_order_price) - 1
@@ -2220,6 +2222,15 @@ class Reinforce(RLAgent):
         """
         padded_lob = lob_list + [[0.0, 0.0]] * (max_length - len(lob_list))
         return padded_lob[:max_length]
+    
+
+    def normalise_state(self, state: np.ndarray) -> np.ndarray:
+        """
+        Normalises the current state using the mean and 
+        standard deviation of the training data.
+        """
+        mean, std = self.norm_params
+        return (state - mean) / std
 
 
     def q_value_function(self, state, action):
@@ -2237,9 +2248,9 @@ class Reinforce(RLAgent):
             order_type = self.orders[0].otype
 
             # Extract relevant features from the lob
-            # obs = self.preprocess_lob(lob)
-            obs = tuple(get_state(self.type, lob, time, self.orders[0].price))
-            state = torch.tensor(obs, dtype=torch.float32).flatten()
+            obs = get_state(self.type, lob, time, self.orders[0].price)
+            norm_obs = self.normalise_state(obs)
+            state = torch.tensor(norm_obs, dtype=torch.float32).flatten()
 
             # Use epsilon-greedy strategy for action selection
             if random.uniform(0, 1) < self.epsilon:
@@ -2275,7 +2286,7 @@ class Reinforce(RLAgent):
             reward = 0.0
             with open(file, 'a', newline='') as f:
                 writer = csv.writer(f)
-                writer.writerow([obs, action, reward])
+                writer.writerow([tuple(obs), action, reward])
 
         return order
 
@@ -2429,6 +2440,7 @@ def populate_market(traders_spec, traders, shuffle, verbose):
             epsilon = trader_params.get('epsilon', 0.9)
             parameters = {'epsilon': epsilon}
             parameters['max_order_price'] = trader_params.get('max_order_price', bse_sys_maxprice/2)
+            parameters['norm_params'] = trader_params.get('norm_params', (0, 1))
             if 'policy' in trader_params:
                 parameters['policy'] = trader_params['policy']
             if 'value_func' in trader_params:
