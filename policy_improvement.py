@@ -22,9 +22,9 @@ import torch.nn.functional as F
 CONFIG = {
     "num_epochs": 20,
     "eval_freq": 1,
-    "train_data_eps": 2100,
-    "val_data_eps": 600,
-    "eval_data_eps": 300,
+    "train_data_eps": 100,
+    "val_data_eps": 20,
+    "eval_data_eps": 20,
     "policy_improv": 10,
     "epsilon": 1.0,
     "batch_size": 64
@@ -57,7 +57,7 @@ order_schedule = {'sup': supply_schedule, 'dem': demand_schedule,
                 'interval': order_interval, 'timemode': 'drip-fixed'}
 # 'max_order_price': supply_schedule[0]['ranges'][0][1]
 sellers_spec = [('GVWY', 9), ('REINFORCE', 1, {'epsilon': 0.97, 'max_order_price': supply_schedule[0]['ranges'][0][1]})]
-buyers_spec = [('ZIC', 10)]
+buyers_spec = [('GVWY', 10)]
 
 
 trader_spec = {'sellers': sellers_spec, 'buyers': buyers_spec}
@@ -70,9 +70,6 @@ market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_
 mean_returns_list = []
 gvwy_returns_list = []
 zic_returns_list = []
-
-value_net = Network(dims=(state_size+action_size, 32, 32, 32, 1), output_activation=None)
-value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
 # Generate training data and normalization parameters
 train_obs, train_actions, train_rewards = generate_data(
@@ -105,12 +102,15 @@ val_obs, _ = normalise_obs(val_obs, obs_norm_params)
 test_obs, _ = normalise_obs(test_obs, obs_norm_params)
 
 # Calculate returns
-train_G, G_norm_params = calculate_returns(train_rewards, gamma=1.0)
-val_G, _ = calculate_returns(val_rewards, gamma=1.0, norm_params=G_norm_params)
-test_G, _ = calculate_returns(test_rewards, gamma=1.0, norm_params=G_norm_params)
+train_G, G_norm_params = calculate_returns(train_rewards, gamma=0.5)
+val_G, _ = calculate_returns(val_rewards, gamma=0.5, norm_params=G_norm_params)
+test_G, _ = calculate_returns(test_rewards, gamma=0.5, norm_params=G_norm_params)
 
 
 for iter in range(1, CONFIG['policy_improv']+1):
+    value_net = Network(dims=(state_size+action_size, 32, 32, 32, 1), output_activation=None)
+    value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
+
     print(f"GPI - {iter}")
 
     # # Plot the distribution of actions
@@ -122,8 +122,8 @@ for iter in range(1, CONFIG['policy_improv']+1):
     # plt.show()
 
     # Policy improvement
-    mean_rl_return, mean_gvwy_return, mean_zic_return = eval_mean_returns(
-                num_trials=10000, value_net=value_net, 
+    mean_rl_return, mean_gvwy_return = eval_mean_returns(
+                num_trials=50, value_net=value_net, 
                 market_params=market_params,
                 norm_params=obs_norm_params
             )
@@ -131,7 +131,7 @@ for iter in range(1, CONFIG['policy_improv']+1):
     print(f"EVALUATION: ITERATION {iter} - MEAN RETURN {mean_rl_return}")
     mean_returns_list.append(mean_rl_return)
     gvwy_returns_list.append(mean_gvwy_return)
-    zic_returns_list.append(mean_zic_return)
+    # zic_returns_list.append(mean_zic_return)
 
     # Policy evaluation
     stats, valid_loss_list, test_loss_list, value_net = train(
@@ -157,16 +157,17 @@ for iter in range(1, CONFIG['policy_improv']+1):
     plt.title(f"Value Loss - Iteration {iter}")
     plt.xlabel("Epoch")
     plt.legend()
-    plt.savefig(f'value_loss_{iter}.png')
-    plt.close()
-    # plt.show()
+    # plt.savefig(f'value_loss_{iter}.png')
+    # plt.close()
+    plt.show()
 
-    # Generate training data and normalization parameters
+    # Generate training data
     train_obs, train_actions, train_rewards = generate_data(
         total_eps=CONFIG['train_data_eps'], 
         market_params=market_params, 
         eps_file='episode_seller.csv',
-        norm_params=obs_norm_params
+        norm_params=obs_norm_params,
+        value_net=value_net
     )
 
     # Generate validation data using training normalization parameters
@@ -174,7 +175,8 @@ for iter in range(1, CONFIG['policy_improv']+1):
         total_eps=CONFIG['val_data_eps'], 
         market_params=market_params, 
         eps_file='episode_seller.csv',
-        norm_params=obs_norm_params  # Use the normalization parameters from training
+        norm_params=obs_norm_params,
+        value_net=value_net
     )
 
     # Generate test data using training normalization parameters
@@ -182,7 +184,8 @@ for iter in range(1, CONFIG['policy_improv']+1):
         total_eps=CONFIG['eval_data_eps'], 
         market_params=market_params, 
         eps_file='episode_seller.csv',
-        norm_params=obs_norm_params  # Use the normalization parameters from training
+        norm_params=obs_norm_params,
+        value_net=value_net
     )
 
     # Normalise training observations
@@ -195,9 +198,9 @@ for iter in range(1, CONFIG['policy_improv']+1):
     test_obs, _ = normalise_obs(test_obs, obs_norm_params)
 
     # Calculate returns
-    train_G, _ = calculate_returns(train_rewards, gamma=1.0, norm_params=G_norm_params)
-    val_G, _ = calculate_returns(val_rewards, gamma=1.0, norm_params=G_norm_params)
-    test_G, _ = calculate_returns(test_rewards, gamma=1.0, norm_params=G_norm_params)
+    train_G, _ = calculate_returns(train_rewards, gamma=0.5, norm_params=G_norm_params)
+    val_G, _ = calculate_returns(val_rewards, gamma=0.5, norm_params=G_norm_params)
+    test_G, _ = calculate_returns(test_rewards, gamma=0.5, norm_params=G_norm_params)
 
 
 

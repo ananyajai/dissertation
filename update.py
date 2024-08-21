@@ -9,9 +9,34 @@ from typing import List, Dict, DefaultDict, Tuple
 action_size = 50
 
 def update(
-        value_net, value_optim, observations: List[np.ndarray], 
-        actions: List[int], rewards: List[float]
-        ) -> Dict[str, float]:
+    value_net: torch.nn.Module, 
+    value_optim: torch.optim.Optimizer, 
+    observations: List[np.ndarray], 
+    actions: List[int], 
+    returns: List[float]
+) -> Dict[str, float]:
+        """
+        Performs a training update on the value network using the given observations, actions, and rewards.
+
+        This function calculates the value loss based on the difference between the predicted values 
+        from the value network and the observed returns (rewards). It then backpropagates this loss 
+        and updates the network's parameters using the provided optimizer.
+
+        Args:
+        value_net (torch.nn.Module): The neural network representing the value function.
+        
+        value_optim (torch.optim.Optimizer): The optimizer used 
+                for updating the parameters of the value network.
+        
+        observations (List[np.ndarray]): A list of observations (states) encountered during the episode.
+        
+        actions (List[int]): A list of actions taken by the agent corresponding to the observations.
+        
+        returns (List[float]): A list of returns received by the agent after taking the actions.
+
+        Returns:
+                Dict[str, float]: A dictionary containing the value lossafter the update step.
+        """
         # Initialise loss and returns
         v_loss = 0
 
@@ -20,7 +45,10 @@ def update(
         one_hot_actions = [np.eye(action_size, dtype=int)[int(action)] for action in actions]
         
         # Concatenate flattened observations with one-hot actions
-        state_action_pairs = [np.concatenate((obs, act)) for obs, act in zip(flattened_observations, one_hot_actions)]
+        state_action_pairs = [
+                np.concatenate((obs, act)) 
+                for obs, act in zip(flattened_observations, one_hot_actions)
+        ]
         
         # Convert state-action pairs to a tensor
         state_action_tensor = torch.tensor(state_action_pairs, dtype=torch.float32)
@@ -28,7 +56,7 @@ def update(
         # Compute baseline values using the current value network
         baseline_values = value_net(state_action_tensor).squeeze()
 
-        G = torch.tensor(rewards, dtype=torch.float32)
+        G = torch.tensor(returns, dtype=torch.float32)
         v_loss = F.mse_loss(baseline_values, G)
         
         # Backpropogate and perform optimisation step for the value function
