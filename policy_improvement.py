@@ -22,9 +22,9 @@ import torch.nn.functional as F
 CONFIG = {
     "num_epochs": 20,
     "eval_freq": 1,
-    "train_data_eps": 100,
-    "val_data_eps": 20,
-    "eval_data_eps": 20,
+    "train_data_eps": 2100,
+    "val_data_eps": 600,
+    "eval_data_eps": 300,
     "policy_improv": 10,
     "epsilon": 1.0,
     "batch_size": 64
@@ -123,7 +123,7 @@ for iter in range(1, CONFIG['policy_improv']+1):
 
     # Policy improvement
     mean_rl_return, mean_gvwy_return = eval_mean_returns(
-                num_trials=50, value_net=value_net, 
+                num_trials=10000, value_net=value_net, 
                 market_params=market_params,
                 norm_params=obs_norm_params
             )
@@ -157,9 +157,9 @@ for iter in range(1, CONFIG['policy_improv']+1):
     plt.title(f"Value Loss - Iteration {iter}")
     plt.xlabel("Epoch")
     plt.legend()
-    # plt.savefig(f'value_loss_{iter}.png')
-    # plt.close()
-    plt.show()
+    plt.savefig(f'value_loss_{iter}.png')
+    plt.close()
+    # plt.show()
 
     # Generate training data
     train_obs, train_actions, train_rewards = generate_data(
@@ -207,7 +207,7 @@ for iter in range(1, CONFIG['policy_improv']+1):
 # Plotting
 plt.plot(mean_returns_list, mb, label='RL')
 plt.plot(gvwy_returns_list, mp, label='GVWY')
-plt.plot(zic_returns_list, '#03045e', label='ZIC')
+# plt.plot(zic_returns_list, '#03045e', label='ZIC')
 plt.legend()
 plt.xlabel('Iterations')
 plt.ylabel('Mean Returns')
