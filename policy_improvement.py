@@ -106,11 +106,10 @@ train_G, G_norm_params = calculate_returns(train_rewards, gamma=0.5)
 val_G, _ = calculate_returns(val_rewards, gamma=0.5, norm_params=G_norm_params)
 test_G, _ = calculate_returns(test_rewards, gamma=0.5, norm_params=G_norm_params)
 
+value_net = Network(dims=(state_size+action_size, 32, 32, 32, 1), output_activation=None)
+value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
 for iter in range(1, CONFIG['policy_improv']+1):
-    value_net = Network(dims=(state_size+action_size, 32, 32, 32, 1), output_activation=None)
-    value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
-
     print(f"GPI - {iter}")
 
     # # Plot the distribution of actions
