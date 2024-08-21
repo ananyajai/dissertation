@@ -25,7 +25,7 @@ CONFIG = {
     "train_data_eps": 2100,
     "val_data_eps": 600,
     "eval_data_eps": 300,
-    "policy_improv": 10,
+    "policy_improv": 30,
     "epsilon": 1.0,
     "batch_size": 64
 }
@@ -121,17 +121,17 @@ for iter in range(1, CONFIG['policy_improv']+1):
     # plt.ylabel("Frequency")
     # plt.show()
 
-    # Policy improvement
-    mean_rl_return, mean_gvwy_return = eval_mean_returns(
-                num_trials=10000, value_net=value_net, 
-                market_params=market_params,
-                norm_params=obs_norm_params
-            )
+    # # Policy improvement
+    # mean_rl_return, mean_gvwy_return = eval_mean_returns(
+    #             num_trials=10000, value_net=value_net, 
+    #             market_params=market_params,
+    #             norm_params=obs_norm_params
+    #         )
     
-    print(f"EVALUATION: ITERATION {iter} - MEAN RETURN {mean_rl_return}")
-    mean_returns_list.append(mean_rl_return)
-    gvwy_returns_list.append(mean_gvwy_return)
-    # zic_returns_list.append(mean_zic_return)
+    # print(f"EVALUATION: ITERATION {iter} - MEAN RETURN {mean_rl_return}")
+    # mean_returns_list.append(mean_rl_return)
+    # gvwy_returns_list.append(mean_gvwy_return)
+    # # zic_returns_list.append(mean_zic_return)
 
     # Policy evaluation
     stats, valid_loss_list, test_loss_list, value_net = train(
@@ -151,15 +151,15 @@ for iter in range(1, CONFIG['policy_improv']+1):
     market_params[3]['sellers'][1][2]['value_func'] = value_net
     market_params = tuple(market_params)
 
-    value_loss = stats['v_loss']
-    plt.plot(value_loss, mb, linewidth=1.0, label='Training Loss')
-    plt.plot(valid_loss_list, mp, linewidth=1.0, label='Validation Loss')
-    plt.title(f"Value Loss - Iteration {iter}")
-    plt.xlabel("Epoch")
-    plt.legend()
-    plt.savefig(f'value_loss_{iter}.png')
-    plt.close()
-    # plt.show()
+    # value_loss = stats['v_loss']
+    # plt.plot(value_loss, mb, linewidth=1.0, label='Training Loss')
+    # plt.plot(valid_loss_list, mp, linewidth=1.0, label='Validation Loss')
+    # plt.title(f"Value Loss - Iteration {iter:02d}")
+    # plt.xlabel("Epoch")
+    # plt.legend()
+    # plt.savefig(f'value_loss_{iter:02d}.png')
+    # plt.close()
+    # # plt.show()
 
     # Generate training data
     train_obs, train_actions, train_rewards = generate_data(
@@ -167,7 +167,8 @@ for iter in range(1, CONFIG['policy_improv']+1):
         market_params=market_params, 
         eps_file='episode_seller.csv',
         norm_params=obs_norm_params,
-        value_net=value_net
+        value_net=value_net,
+        iter=iter
     )
 
     # Generate validation data using training normalization parameters
@@ -204,15 +205,15 @@ for iter in range(1, CONFIG['policy_improv']+1):
 
 
 
-# Plotting
-plt.plot(mean_returns_list, mb, label='RL')
-plt.plot(gvwy_returns_list, mp, label='GVWY')
-# plt.plot(zic_returns_list, '#03045e', label='ZIC')
-plt.legend()
-plt.xlabel('Iterations')
-plt.ylabel('Mean Returns')
-plt.title('Policy Improvement')
-plt.savefig('policy_improvement.png')
-# plt.show()
+# # Plotting
+# plt.plot(mean_returns_list, mb, label='RL')
+# plt.plot(gvwy_returns_list, mp, label='GVWY')
+# # plt.plot(zic_returns_list, '#03045e', label='ZIC')
+# plt.legend()
+# plt.xlabel('Iterations')
+# plt.ylabel('Mean Returns')
+# plt.title('Policy Improvement')
+# plt.savefig('policy_improvement.png')
+# # plt.show()
 
 

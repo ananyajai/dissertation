@@ -74,7 +74,7 @@ action_size = 50
 
 def generate_data(
         total_eps: int, market_params: tuple, eps_file: str, 
-        norm_params:tuple=None, value_net=None
+        norm_params:tuple=None, value_net=None, iter:int=0
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Tuple]:
     """
     Generates data by running market session total_eps times.
@@ -114,6 +114,34 @@ def generate_data(
         rewards_list.append(eps_rewards)
 
     # visualise_data(obs_list, action_list, rewards_list)
+    if total_eps > 2000:
+        # Define your price ranges
+        price_ranges = [(50, 70), (71, 90), (91, 110), (111, 130), (131, 150)]
+
+        # Initialise lists to hold actions for each price range
+        range_actions = [[] for _ in range(len(price_ranges))]
+
+        # Flatten actions and separate them based on price ranges
+        for episode_obs, episode_actions in zip(obs_list, action_list):
+            for obs, action in zip(episode_obs, episode_actions):
+                price = obs[1]  # Assuming the second element in observation is the order price
+                for i, (low, high) in enumerate(price_ranges):
+                    if low <= price < high:
+                        range_actions[i].append(action)
+                        break
+
+        # Plot histograms for each price range
+        fig, axs = plt.subplots(1, 5, figsize=(20, 4))
+
+        for i, (low, high) in enumerate(price_ranges):
+            axs[i].hist(range_actions[i], bins=action_size, color=five_colours[i], alpha=0.8)
+            axs[i].set_title(f"Price Range: {low}-{high}")
+            axs[i].set_xlabel("Actions")
+            axs[i].set_ylabel("Frequency")
+
+        plt.tight_layout()
+        plt.savefig(f"actions_dist_iter_{iter:02d}.png")
+        plt.close()
 
     return obs_list, action_list, rewards_list
 
