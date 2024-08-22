@@ -20,12 +20,12 @@ import torch.nn.functional as F
 
 
 CONFIG = {
-    "num_epochs": 20,
+    "num_epochs": 5,
     "eval_freq": 1,
-    "train_data_eps": 2100,
-    "val_data_eps": 600,
-    "eval_data_eps": 300,
-    "policy_improv": 30,
+    "train_data_eps": 8,
+    "val_data_eps": 1,
+    "eval_data_eps": 1,
+    "policy_improv": 1,
     "epsilon": 1.0,
     "batch_size": 64
 }
@@ -36,7 +36,7 @@ mb = '#085ea8'
 mp = '#eeadad'
 
 # Define the value function neural network
-state_size = 14
+state_size = 15
 action_size = 50
 
 # Define market parameters
@@ -166,8 +166,7 @@ for iter in range(1, CONFIG['policy_improv']+1):
         market_params=market_params, 
         eps_file='episode_seller.csv',
         norm_params=obs_norm_params,
-        value_net=value_net,
-        iter=iter
+        value_net=value_net
     )
 
     # Generate validation data using training normalization parameters

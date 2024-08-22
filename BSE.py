@@ -144,7 +144,7 @@ def get_discrete_state(type, lob, time, order):
     return observation
 
 
-def get_state(type, lob, time, order):
+def get_state(type, lob, time, order, countdown):
     n_buyers = lob['bids']['n']
     n_sellers = lob['asks']['n']
     best_bid = lob['bids']['best'] if lob['bids']['best'] else bse_sys_minprice
@@ -170,7 +170,7 @@ def get_state(type, lob, time, order):
     observation = np.array([float(time), float(order), int(n_buyers), int(n_sellers),
                             float(best_bid), float(best_ask), float(worst_bid), float(worst_ask),
                             float(avg_bid), float(avg_ask), float(var_bid), 
-                            float(var_ask), float(last_trade_price), float(avg_trade_price)])
+                            float(var_ask), float(last_trade_price), float(avg_trade_price), float(countdown)])
 
     return observation
 
@@ -2161,7 +2161,7 @@ class Reinforce(RLAgent):
     ):
         
         super().__init__(ttype, tid, balance, params, time, action_space, obs_space, gamma, epsilon)
-        self.state_size = 14
+        self.state_size = 15
         self.action_size = self.action_space.n
         self.learning_rate = learning_rate
         
@@ -2251,7 +2251,7 @@ class Reinforce(RLAgent):
             order_type = self.orders[0].otype
 
             # Extract relevant features from the lob
-            obs = get_state(self.type, lob, time, self.orders[0].price)
+            obs = get_state(self.type, lob, time, self.orders[0].price, countdown)
             norm_obs = self.normalise_state(obs)
             state = torch.tensor(norm_obs, dtype=torch.float32).flatten()
 
