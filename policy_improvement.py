@@ -21,11 +21,11 @@ import torch.nn.functional as F
 
 CONFIG = {
     "num_epochs": 20,
-    "eval_freq": 1,
-    "train_data_eps": 2100,
-    "val_data_eps": 600,
-    "eval_data_eps": 300,
-    "policy_improv": 5,
+    "eval_freq": 20,
+    "train_data_eps": 3000,
+    "val_data_eps": 20,
+    "eval_data_eps": 20,
+    "policy_improv": 30,
     "epsilon": 1.0,
     "batch_size": 64
 }
@@ -120,17 +120,17 @@ for iter in range(1, CONFIG['policy_improv']+1):
     # plt.ylabel("Frequency")
     # plt.show()
 
-    # Policy improvement
-    mean_rl_return, mean_gvwy_return = eval_mean_returns(
-                num_trials=10000, value_net=value_net, 
-                market_params=market_params,
-                norm_params=obs_norm_params
-            )
+    # # Policy improvement
+    # mean_rl_return, mean_gvwy_return = eval_mean_returns(
+    #             num_trials=10000, value_net=value_net, 
+    #             market_params=market_params,
+    #             norm_params=obs_norm_params
+    #         )
     
-    print(f"EVALUATION: ITERATION {iter} - RL RETURN {mean_rl_return}, GVWY RETURN {mean_gvwy_return}")
-    mean_returns_list.append(mean_rl_return)
-    gvwy_returns_list.append(mean_gvwy_return)
-    # zic_returns_list.append(mean_zic_return)
+    # print(f"EVALUATION: ITERATION {iter} - RL RETURN {mean_rl_return}, GVWY RETURN {mean_gvwy_return}")
+    # mean_returns_list.append(mean_rl_return)
+    # gvwy_returns_list.append(mean_gvwy_return)
+    # # zic_returns_list.append(mean_zic_return)
 
     # Policy evaluation
     stats, valid_loss_list, test_loss_list, value_net = train(

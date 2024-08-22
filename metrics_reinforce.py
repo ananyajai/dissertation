@@ -11,6 +11,7 @@ from early_stopping import EarlyStopping
 from update import update
 from normalise import normalise_returns, normalise_obs
 from visualise import visualise_data
+from matplotlib.ticker import MaxNLocator
 
 from neural_network import Network
 import torch
@@ -62,8 +63,8 @@ order_interval = 60
 order_schedule = {'sup': supply_schedule, 'dem': demand_schedule,
                 'interval': order_interval, 'timemode': 'drip-fixed'}
 
-sellers_spec = [('GVWY', 9), ('REINFORCE', 1, {'epsilon': 1.0})]
-buyers_spec = [('GVWY', 10)]
+sellers_spec = [('GVWY', 19), ('REINFORCE', 1, {'epsilon': 1.0})]
+buyers_spec = [('SHVR', 4), ('GVWY', 4), ('ZIC', 4), ('SNPR', 4), ('ZIP', 4)]
 
 trader_spec = {'sellers': sellers_spec, 'buyers': buyers_spec}
 
@@ -113,8 +114,58 @@ def generate_data(
         action_list.append(eps_actions)
         rewards_list.append(eps_rewards)
 
-
     # visualise_data(obs_list, action_list, rewards_list)
+    if total_eps > 50:
+        # Define your price ranges
+        countdown_ranges = [(0.8, 1.0), (0.6, 0.79), (0.4, 0.59), (0.2, 0.39), (0, 0.19)]
+        price_ranges = [(50, 70), (71, 90), (91, 110), (111, 130), (131, 150)]
+
+        # Initialise lists to hold actions for each price range
+        range_actions = [[] for _ in range(len(countdown_ranges))]
+        range_prices = [[] for _ in range(len(price_ranges))]
+
+        # Flatten actions and separate them based on price ranges
+        for episode_obs, episode_actions in zip(obs_list, action_list):
+            for obs, action in zip(episode_obs, episode_actions):
+                countdown = obs[-1]  
+                price = obs[1]
+                for i, (low, high) in enumerate(countdown_ranges):
+                    if low <= countdown < high:
+                        range_actions[i].append(action)
+                        break
+                for i, (low, high) in enumerate(price_ranges):
+                    if low <= price < high:
+                        range_prices[i].append(action)
+                        break
+
+        # Plot histograms for each price range
+        fig, axs = plt.subplots(1, 5, figsize=(20, 4))
+
+        for i, (low, high) in enumerate(countdown_ranges):
+            axs[i].hist(range_actions[i], bins=action_size, color=five_colours[i], alpha=0.8)
+            axs[i].set_title(f"Countdown Range: {low}-{high}")
+            axs[i].set_xlabel("Actions")
+            axs[i].set_ylabel("Frequency")
+            axs[i].yaxis.set_major_locator(MaxNLocator(integer=True))
+
+        # plt.tight_layout()
+        # plt.savefig(f"actions_dist_cdown_{iter}.png")
+        # plt.close()
+        plt.show()
+
+        fig, axs = plt.subplots(1, 5, figsize=(20, 4))
+
+        for i, (low, high) in enumerate(price_ranges):
+            axs[i].hist(range_prices[i], bins=action_size, color=five_colours[i], alpha=0.8)
+            axs[i].set_title(f"Price Range: {low}-{high}")
+            axs[i].set_xlabel("Actions")
+            axs[i].set_ylabel("Frequency")
+            axs[i].yaxis.set_major_locator(MaxNLocator(integer=True))
+            
+        # plt.tight_layout()
+        # plt.savefig(f"actions_dist_price_{iter}.png")
+        # plt.close()
+        plt.show()
 
     return obs_list, action_list, rewards_list
 
@@ -475,9 +526,9 @@ def eval_mean_returns(num_trials, value_net, market_params, norm_params:tuple=(0
 # # fig_validation.tight_layout()
 
 # # # Save figures
-# fig_training.savefig("train_valid_loss_cdown.png")
+# fig_training.savefig("train_valid_loss_mixtrader.png")
 # # # fig_returns.savefig("mean_return_gammas.png")
-# fig_testing.savefig("testing_loss_cdown.png")
+# fig_testing.savefig("testing_loss_mixtrader.png")
 # # # fig_validation.savefig("validation_loss_gammas.png")
 
 # # plt.show()
