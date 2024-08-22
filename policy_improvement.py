@@ -20,12 +20,12 @@ import torch.nn.functional as F
 
 
 CONFIG = {
-    "num_epochs": 5,
+    "num_epochs": 20,
     "eval_freq": 1,
-    "train_data_eps": 8,
-    "val_data_eps": 1,
-    "eval_data_eps": 1,
-    "policy_improv": 1,
+    "train_data_eps": 2100,
+    "val_data_eps": 600,
+    "eval_data_eps": 300,
+    "policy_improv": 5,
     "epsilon": 1.0,
     "batch_size": 64
 }
@@ -120,17 +120,17 @@ for iter in range(1, CONFIG['policy_improv']+1):
     # plt.ylabel("Frequency")
     # plt.show()
 
-    # # Policy improvement
-    # mean_rl_return, mean_gvwy_return = eval_mean_returns(
-    #             num_trials=10000, value_net=value_net, 
-    #             market_params=market_params,
-    #             norm_params=obs_norm_params
-    #         )
+    # Policy improvement
+    mean_rl_return, mean_gvwy_return = eval_mean_returns(
+                num_trials=10000, value_net=value_net, 
+                market_params=market_params,
+                norm_params=obs_norm_params
+            )
     
-    # print(f"EVALUATION: ITERATION {iter} - MEAN RETURN {mean_rl_return}")
-    # mean_returns_list.append(mean_rl_return)
-    # gvwy_returns_list.append(mean_gvwy_return)
-    # # zic_returns_list.append(mean_zic_return)
+    print(f"EVALUATION: ITERATION {iter} - RL RETURN {mean_rl_return}, GVWY RETURN {mean_gvwy_return}")
+    mean_returns_list.append(mean_rl_return)
+    gvwy_returns_list.append(mean_gvwy_return)
+    # zic_returns_list.append(mean_zic_return)
 
     # Policy evaluation
     stats, valid_loss_list, test_loss_list, value_net = train(
@@ -203,15 +203,15 @@ for iter in range(1, CONFIG['policy_improv']+1):
 
 
 
-# # Plotting
-# plt.plot(mean_returns_list, mb, label='RL')
+# Plotting
+plt.plot(mean_returns_list, mb, label='RL')
 # plt.plot(gvwy_returns_list, mp, label='GVWY')
-# # plt.plot(zic_returns_list, '#03045e', label='ZIC')
-# plt.legend()
-# plt.xlabel('Iterations')
-# plt.ylabel('Mean Returns')
-# plt.title('Policy Improvement')
-# plt.savefig('policy_improvement.png')
-# # plt.show()
+# plt.plot(zic_returns_list, '#03045e', label='ZIC')
+plt.legend()
+plt.xlabel('Iterations')
+plt.ylabel('Mean Returns')
+plt.title('Policy Improvement')
+plt.savefig('policy_improvement.png')
+# plt.show()
 
 
