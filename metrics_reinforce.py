@@ -71,11 +71,11 @@ trader_spec = {'sellers': sellers_spec, 'buyers': buyers_spec}
 dump_flags = {'dump_strats': False, 'dump_lobs': False, 'dump_avgbals': True, 'dump_tape': False, 'dump_blotters': False}
 verbose = False
 
-market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose)
+# market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose)
 
 def generate_data(
         total_eps: int, market_params: tuple, eps_file: str, 
-        norm_params:tuple=None, value_net=None
+        norm_params:tuple=None, value_net=None, iter:int=0
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Tuple]:
     """
     Generates data by running market session total_eps times.
@@ -148,10 +148,10 @@ def generate_data(
             axs[i].set_ylabel("Frequency")
             axs[i].yaxis.set_major_locator(MaxNLocator(integer=True))
 
-        # plt.tight_layout()
-        # plt.savefig(f"actions_dist_cdown_{iter}.png")
-        # plt.close()
-        plt.show()
+        plt.tight_layout()
+        plt.savefig(f"actions_dist_cdown_{iter}.png")
+        plt.close()
+        # plt.show()
 
         fig, axs = plt.subplots(1, 5, figsize=(20, 4))
 
@@ -161,11 +161,11 @@ def generate_data(
             axs[i].set_xlabel("Actions")
             axs[i].set_ylabel("Frequency")
             axs[i].yaxis.set_major_locator(MaxNLocator(integer=True))
-            
-        # plt.tight_layout()
-        # plt.savefig(f"actions_dist_price_{iter}.png")
-        # plt.close()
-        plt.show()
+
+        plt.tight_layout()
+        plt.savefig(f"actions_dist_price_{iter}.png")
+        plt.close()
+        # plt.show()
 
     return obs_list, action_list, rewards_list
 

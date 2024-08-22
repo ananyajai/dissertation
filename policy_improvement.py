@@ -166,7 +166,8 @@ for iter in range(1, CONFIG['policy_improv']+1):
         market_params=market_params, 
         eps_file='episode_seller.csv',
         norm_params=obs_norm_params,
-        value_net=value_net
+        value_net=value_net,
+        iter=iter
     )
 
     # Generate validation data using training normalization parameters
@@ -213,5 +214,3 @@ plt.ylabel('Mean Returns')
 plt.title('Policy Improvement')
 plt.savefig('policy_improvement.png')
 # plt.show()
-
-
