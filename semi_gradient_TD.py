@@ -36,8 +36,8 @@ mp = '#d43d51'
 # Define the value function neural network
 state_size = 15
 action_size = 50
-value_net = Network(dims=(state_size+action_size, 32, 32, 32, 1), output_activation=None)
-value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
+# value_net = Network(dims=(state_size+action_size, 32, 32, 32, 1), output_activation=None)
+# value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
 # colours = ['#085ea8', '#5379b7', '#7e95c5', '#a5b3d4', '#cbd1e2', 
 #            '#f1cfce', '#eeadad', '#e88b8d', '#df676e', '#d43d51']
