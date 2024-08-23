@@ -22,9 +22,9 @@ import torch.nn.functional as F
 CONFIG = {
     "total_eps": 50,
     "eval_freq": 1,
-    "train_data_eps": 3500,
-    "val_data_eps": 1000,
-    "eval_data_eps": 500,
+    "train_data_eps": 5000,
+    "val_data_eps": 4000,
+    "eval_data_eps": 3000,
     "gamma": 0.8,
     "epsilon": 1.0,
     "batch_size": 32
@@ -44,7 +44,7 @@ action_size = 50
 # Define market parameters
 sess_id = 'session_1'
 start_time = 0.0
-end_time = 180.0
+end_time = 60.0
 
 # range1 = (50, 100)
 # range2 = (100, 150)
@@ -58,7 +58,7 @@ supply_schedule = [{'from': start_time, 'to': end_time, 'ranges': [range2], 'ste
 demand_schedule = supply_schedule
 
 # new customer orders arrive at each trader approx once every order_interval seconds
-order_interval = 30
+order_interval = 60
 
 order_schedule = {'sup': supply_schedule, 'dem': demand_schedule,
                 'interval': order_interval, 'timemode': 'drip-fixed'}
@@ -114,7 +114,7 @@ def generate_data(
         action_list.append(eps_actions)
         rewards_list.append(eps_rewards)
 
-    # visualise_data(obs_list, action_list, rewards_list)
+    visualise_data(obs_list, action_list, rewards_list, total_eps)
 
     return obs_list, action_list, rewards_list
 
@@ -338,14 +338,14 @@ test_obs, test_actions, test_rewards = generate_data(
     eps_file='episode_seller.csv'
 )
 
-# Normalise training observations
-train_obs, obs_norm_params = normalise_obs(train_obs)
+# # Normalise training observations
+# train_obs, obs_norm_params = normalise_obs(train_obs)
 
-# Normalise validation observations
-val_obs, _ = normalise_obs(val_obs, obs_norm_params)
+# # Normalise validation observations
+# val_obs, _ = normalise_obs(val_obs, obs_norm_params)
 
-# Normalise testing observations
-test_obs, _ = normalise_obs(test_obs, obs_norm_params)
+# # Normalise testing observations
+# test_obs, _ = normalise_obs(test_obs, obs_norm_params)
 
 # # Calculate returns
 # train_G, G_norm_params = calculate_returns(train_rewards, gamma=0.4)
@@ -398,87 +398,87 @@ test_obs, _ = normalise_obs(test_obs, obs_norm_params)
 # # plt.show()
 
 
-gamma_list = np.linspace(0, 1, 11)
+# gamma_list = np.linspace(0, 1, 11)
 
-# Set up the subplot grid
-fig_training, axs_training = plt.subplots(3, 4, figsize=(20, 15))
-fig_testing, axs_testing = plt.subplots(3, 4, figsize=(20, 15))
-# fig_validation, axs_validation = plt.subplots(3, 4, figsize=(20, 15))
-# fig_returns, axs_returns = plt.subplots(3, 4, figsize=(20, 15))
+# # Set up the subplot grid
+# fig_training, axs_training = plt.subplots(3, 4, figsize=(20, 15))
+# fig_testing, axs_testing = plt.subplots(3, 4, figsize=(20, 15))
+# # fig_validation, axs_validation = plt.subplots(3, 4, figsize=(20, 15))
+# # fig_returns, axs_returns = plt.subplots(3, 4, figsize=(20, 15))
 
-# Flatten the axes arrays for easy indexing
-axs_training = axs_training.flatten()
-axs_testing = axs_testing.flatten()
-# axs_validation = axs_validation.flatten()
-# axs_returns = axs_returns.flatten()
+# # Flatten the axes arrays for easy indexing
+# axs_training = axs_training.flatten()
+# axs_testing = axs_testing.flatten()
+# # axs_validation = axs_validation.flatten()
+# # axs_returns = axs_returns.flatten()
 
-# Remove the last subplot (12th) if not needed
-fig_training.delaxes(axs_training[-1])
-fig_testing.delaxes(axs_testing[-1])
-# fig_validation.delaxes(axs_validation[-1])
-# fig_returns.delaxes(axs_returns[-1])
+# # Remove the last subplot (12th) if not needed
+# fig_training.delaxes(axs_training[-1])
+# fig_testing.delaxes(axs_testing[-1])
+# # fig_validation.delaxes(axs_validation[-1])
+# # fig_returns.delaxes(axs_returns[-1])
 
-# Start training
-for i, gamma in enumerate(gamma_list):
-    # Reinitialise the neural network and optimizer for each gamma value
-    value_net = Network(dims=(state_size + action_size, 32, 32, 32, 1), output_activation=None)
-    value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
+# # Start training
+# for i, gamma in enumerate(gamma_list):
+#     # Reinitialise the neural network and optimizer for each gamma value
+#     value_net = Network(dims=(state_size + action_size, 32, 32, 32, 1), output_activation=None)
+#     value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
-    # Calculate returns
-    train_G, G_norm_params = calculate_returns(train_rewards, gamma=gamma)
-    val_G, _ = calculate_returns(val_rewards, gamma=gamma, norm_params=G_norm_params)
-    test_G, _ = calculate_returns(test_rewards, gamma=gamma, norm_params=G_norm_params)
+#     # Calculate returns
+#     train_G, G_norm_params = calculate_returns(train_rewards, gamma=gamma)
+#     val_G, _ = calculate_returns(val_rewards, gamma=gamma, norm_params=G_norm_params)
+#     test_G, _ = calculate_returns(test_rewards, gamma=gamma, norm_params=G_norm_params)
 
-    # Train the value function
-    stats, valid_loss_list, test_loss_list, value_net = train(
-            train_obs, train_actions, train_G,
-            val_obs, val_actions, val_G,
-            test_obs, test_actions, test_G,
-            epochs=CONFIG['total_eps'],
-            eval_freq=CONFIG["eval_freq"],
-            value_net=value_net, value_optim=value_optim,
-            batch_size=CONFIG["batch_size"]
-        )
+#     # Train the value function
+#     stats, valid_loss_list, test_loss_list, value_net = train(
+#             train_obs, train_actions, train_G,
+#             val_obs, val_actions, val_G,
+#             test_obs, test_actions, test_G,
+#             epochs=CONFIG['total_eps'],
+#             eval_freq=CONFIG["eval_freq"],
+#             value_net=value_net, value_optim=value_optim,
+#             batch_size=CONFIG["batch_size"]
+#         )
 
-    value_loss = stats['v_loss']
+#     value_loss = stats['v_loss']
 
-    # # Plot mean return
-    # axs_returns[i].plot(mean_return_list, 'c', linewidth=1.0)
-    # axs_returns[i].set_title(f"Mean Return, γ={gamma:.1f}")
-    # axs_returns[i].set_xlabel("Iteration")
+#     # # Plot mean return
+#     # axs_returns[i].plot(mean_return_list, 'c', linewidth=1.0)
+#     # axs_returns[i].set_title(f"Mean Return, γ={gamma:.1f}")
+#     # axs_returns[i].set_xlabel("Iteration")
 
-    # Plot training loss
-    axs_training[i].plot(value_loss, mb, linewidth=1.0, label='Training Loss')
-    axs_training[i].plot(valid_loss_list, mp, linewidth=1.0, label='Validation Loss')
-    axs_training[i].set_title(f"γ={gamma:.1f}", fontsize=18)
-    axs_training[i].set_xlabel("Epochs", fontsize=16)
-    axs_training[i].set_ylabel("Loss", fontsize=16)
-    axs_training[i].legend()
+#     # Plot training loss
+#     axs_training[i].plot(value_loss, mb, linewidth=1.0, label='Training Loss')
+#     axs_training[i].plot(valid_loss_list, mp, linewidth=1.0, label='Validation Loss')
+#     axs_training[i].set_title(f"γ={gamma:.1f}", fontsize=18)
+#     axs_training[i].set_xlabel("Epochs", fontsize=16)
+#     axs_training[i].set_ylabel("Loss", fontsize=16)
+#     axs_training[i].legend()
 
-    # Plot testing loss
-    x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps'] + 1, CONFIG['eval_freq'])
-    axs_testing[i].plot(x_ticks, test_loss_list, '#03045e')
-    axs_testing[i].set_title(f"γ={gamma:.1f}", fontsize=18)
-    axs_testing[i].set_xlabel("Epochs", fontsize=16)
-    axs_testing[i].set_ylabel("Loss", fontsize=16)
+#     # Plot testing loss
+#     x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps'] + 1, CONFIG['eval_freq'])
+#     axs_testing[i].plot(x_ticks, test_loss_list, '#03045e')
+#     axs_testing[i].set_title(f"γ={gamma:.1f}", fontsize=18)
+#     axs_testing[i].set_xlabel("Epochs", fontsize=16)
+#     axs_testing[i].set_ylabel("Loss", fontsize=16)
 
-    # # Plot validation loss
-    # axs_validation[i].plot(x_ticks, valid_loss_list, 'g')
-    # axs_validation[i].set_title(f"Validation Loss, γ={gamma:.1f}")
-    # axs_validation[i].set_xlabel("Epoch")
-    # axs_validation[i].set_ylabel("Loss")
+#     # # Plot validation loss
+#     # axs_validation[i].plot(x_ticks, valid_loss_list, 'g')
+#     # axs_validation[i].set_title(f"Validation Loss, γ={gamma:.1f}")
+#     # axs_validation[i].set_xlabel("Epoch")
+#     # axs_validation[i].set_ylabel("Loss")
 
-# Adjust layout
-fig_training.tight_layout()
-# fig_returns.tight_layout()
-fig_testing.tight_layout()
-# fig_validation.tight_layout()
+# # Adjust layout
+# fig_training.tight_layout()
+# # fig_returns.tight_layout()
+# fig_testing.tight_layout()
+# # fig_validation.tight_layout()
 
-# # Save figures
-fig_training.savefig("train_valid_loss_tradwinds.png")
-# # fig_returns.savefig("mean_return_gammas.png")
-fig_testing.savefig("testing_loss_tradwinds.png")
-# # fig_validation.savefig("validation_loss_gammas.png")
+# # # Save figures
+# fig_training.savefig("train_valid_loss_tradwinds.png")
+# # # fig_returns.savefig("mean_return_gammas.png")
+# fig_testing.savefig("testing_loss_tradwinds.png")
+# # # fig_validation.savefig("validation_loss_gammas.png")
 
-# plt.show()
+# # plt.show()
 
