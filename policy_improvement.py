@@ -22,10 +22,10 @@ import torch.nn.functional as F
 CONFIG = {
     "num_epochs": 20,
     "eval_freq": 1,
-    "train_data_eps": 21,
-    "val_data_eps": 6,
-    "eval_data_eps": 3,
-    "policy_improv": 5,
+    "train_data_eps": 3500,
+    "val_data_eps": 1000,
+    "eval_data_eps": 500,
+    "policy_improv": 10,
     "epsilon": 1.0,
     "batch_size": 64
 }
@@ -108,13 +108,13 @@ for iter in range(0, CONFIG['policy_improv']+1):
     test_obs, _ = normalise_obs(test_obs, obs_norm_params)
 
     # Calculate returns
-    train_G, G_norm_params = calculate_returns(train_rewards, gamma=0.5)
-    val_G, _ = calculate_returns(val_rewards, gamma=0.5, norm_params=G_norm_params)
-    test_G, _ = calculate_returns(test_rewards, gamma=0.5, norm_params=G_norm_params)
+    train_G, G_norm_params = calculate_returns(train_rewards, gamma=0.3)
+    val_G, _ = calculate_returns(val_rewards, gamma=0.3, norm_params=G_norm_params)
+    test_G, _ = calculate_returns(test_rewards, gamma=0.3, norm_params=G_norm_params)
 
     # Policy improvement
     mean_rl_return, mean_gvwy_return = eval_mean_returns(
-                num_trials=20, value_net=value_net, 
+                num_trials=10000, value_net=value_net, 
                 market_params=market_params,
                 norm_params=obs_norm_params
             )
@@ -155,14 +155,10 @@ for iter in range(0, CONFIG['policy_improv']+1):
 
 
 # Plotting
-plt.plot(rl_returns_list, mb, label='RL')
-# plt.plot(gvwy_returns_list, mp, label='GVWY')
-# plt.plot(zic_returns_list, '#03045e', label='ZIC')
-plt.legend()
+plt.plot(rl_returns_list, mb)
 plt.xlabel('Iterations')
 plt.ylabel('Average Returns')
-# plt.title('Policy Improvement')
-plt.savefig('policy_improvement.png')
+plt.savefig('policy_improv_gvwys.png')
 # plt.show()
 plt.close()
 
@@ -173,6 +169,5 @@ plt.plot(gvwy_returns_list, mp, label='GVWY')
 plt.legend()
 plt.xlabel('Iterations')
 plt.ylabel('Average Returns')
-# plt.title('Policy Improvement')
 plt.savefig('policy_improv_traders.png')
 # plt.show()
