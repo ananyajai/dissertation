@@ -114,8 +114,6 @@ def generate_data(
         action_list.append(eps_actions)
         rewards_list.append(eps_rewards)
 
-    visualise_data(obs_list, action_list, rewards_list, total_eps)
-
     return obs_list, action_list, rewards_list
 
 
@@ -317,26 +315,26 @@ def eval_mean_returns(num_trials, value_net, market_params, norm_params:tuple=(0
     return mean_rl_return, mean_gvwy_return
 
 
-# Generate training data and normalization parameters
-train_obs, train_actions, train_rewards = generate_data(
-    total_eps=CONFIG['train_data_eps'], 
-    market_params=market_params, 
-    eps_file='episode_seller.csv'
-)
+# # Generate training data and normalization parameters
+# train_obs, train_actions, train_rewards = generate_data(
+#     total_eps=CONFIG['train_data_eps'], 
+#     market_params=market_params, 
+#     eps_file='episode_seller.csv'
+# )
 
-# Generate validation data using training normalization parameters
-val_obs, val_actions, val_rewards = generate_data(
-    total_eps=CONFIG['val_data_eps'], 
-    market_params=market_params, 
-    eps_file='episode_seller.csv'
-)
+# # Generate validation data using training normalization parameters
+# val_obs, val_actions, val_rewards = generate_data(
+#     total_eps=CONFIG['val_data_eps'], 
+#     market_params=market_params, 
+#     eps_file='episode_seller.csv'
+# )
 
-# Generate test data using training normalization parameters
-test_obs, test_actions, test_rewards = generate_data(
-    total_eps=CONFIG['eval_data_eps'], 
-    market_params=market_params, 
-    eps_file='episode_seller.csv'
-)
+# # Generate test data using training normalization parameters
+# test_obs, test_actions, test_rewards = generate_data(
+#     total_eps=CONFIG['eval_data_eps'], 
+#     market_params=market_params, 
+#     eps_file='episode_seller.csv'
+# )
 
 # # Normalise training observations
 # train_obs, obs_norm_params = normalise_obs(train_obs)

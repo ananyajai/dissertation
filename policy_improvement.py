@@ -21,11 +21,11 @@ import torch.nn.functional as F
 
 CONFIG = {
     "num_epochs": 20,
-    "eval_freq": 20,
-    "train_data_eps": 3000,
-    "val_data_eps": 20,
-    "eval_data_eps": 20,
-    "policy_improv": 30,
+    "eval_freq": 1,
+    "train_data_eps": 21,
+    "val_data_eps": 6,
+    "eval_data_eps": 3,
+    "policy_improv": 5,
     "epsilon": 1.0,
     "batch_size": 64
 }
@@ -33,7 +33,7 @@ CONFIG = {
 colours = ['#03045e','#085ea8', '#7e95c5', '#eeadad', '#df676e', '#d43d51']
 five_colours = ['#03045e','#085ea8', '#7e95c5', '#eeadad', '#d43d51']
 mb = '#085ea8'
-mp = '#eeadad'
+mp = '#d43d51'
 
 # Define the value function neural network
 state_size = 15
@@ -67,70 +67,62 @@ verbose = False
 
 market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose)
 
-mean_returns_list = []
+rl_returns_list = []
 gvwy_returns_list = []
 zic_returns_list = []
-
-# Generate training data and normalization parameters
-train_obs, train_actions, train_rewards = generate_data(
-    total_eps=CONFIG['train_data_eps'], 
-    market_params=market_params, 
-    eps_file='episode_seller.csv'
-)
-
-# Generate validation data using training normalization parameters
-val_obs, val_actions, val_rewards = generate_data(
-    total_eps=CONFIG['val_data_eps'], 
-    market_params=market_params, 
-    eps_file='episode_seller.csv'
-)
-
-# Generate test data using training normalization parameters
-test_obs, test_actions, test_rewards = generate_data(
-    total_eps=CONFIG['eval_data_eps'], 
-    market_params=market_params, 
-    eps_file='episode_seller.csv'
-)
-
-# Normalise training observations
-train_obs, obs_norm_params = normalise_obs(train_obs)
-
-# Normalise validation observations
-val_obs, _ = normalise_obs(val_obs, obs_norm_params)
-
-# Normalise testing observations
-test_obs, _ = normalise_obs(test_obs, obs_norm_params)
-
-# Calculate returns
-train_G, G_norm_params = calculate_returns(train_rewards, gamma=0.5)
-val_G, _ = calculate_returns(val_rewards, gamma=0.5, norm_params=G_norm_params)
-test_G, _ = calculate_returns(test_rewards, gamma=0.5, norm_params=G_norm_params)
 
 value_net = Network(dims=(state_size+action_size, 32, 32, 32, 1), output_activation=None)
 value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
-for iter in range(1, CONFIG['policy_improv']+1):
+for iter in range(0, CONFIG['policy_improv']+1):
     print(f"GPI - {iter}")
 
-    # # Plot the distribution of actions
-    # flat_actions = [a for actions in train_actions for a in actions]
-    # plt.hist(flat_actions, bins=action_size, color=mp, alpha=0.9, label='Actions')
-    # plt.title(f"Actions Distribution")
-    # plt.xlabel("Actions")
-    # plt.ylabel("Frequency")
-    # plt.show()
+    # Generate training data and normalisation parameters
+    train_obs, train_actions, train_rewards = generate_data(
+        total_eps=CONFIG['train_data_eps'], 
+        market_params=market_params, 
+        eps_file='episode_seller.csv'
+    )
 
-    # # Policy improvement
-    # mean_rl_return, mean_gvwy_return = eval_mean_returns(
-    #             num_trials=10000, value_net=value_net, 
-    #             market_params=market_params,
-    #             norm_params=obs_norm_params
-    #         )
+    # Generate validation data using training normalisation parameters
+    val_obs, val_actions, val_rewards = generate_data(
+        total_eps=CONFIG['val_data_eps'], 
+        market_params=market_params, 
+        eps_file='episode_seller.csv'
+    )
+
+    # Generate test data using training normaliation parameters
+    test_obs, test_actions, test_rewards = generate_data(
+        total_eps=CONFIG['eval_data_eps'], 
+        market_params=market_params, 
+        eps_file='episode_seller.csv'
+    )
+
+    # Normalise training observations
+    train_obs, obs_norm_params = normalise_obs(train_obs)
+
+    # Normalise validation observations
+    val_obs, _ = normalise_obs(val_obs, obs_norm_params)
+
+    # Normalise testing observations
+    test_obs, _ = normalise_obs(test_obs, obs_norm_params)
+
+    # Calculate returns
+    train_G, G_norm_params = calculate_returns(train_rewards, gamma=0.5)
+    val_G, _ = calculate_returns(val_rewards, gamma=0.5, norm_params=G_norm_params)
+    test_G, _ = calculate_returns(test_rewards, gamma=0.5, norm_params=G_norm_params)
+
+    # Policy improvement
+    mean_rl_return, mean_gvwy_return = eval_mean_returns(
+                num_trials=20, value_net=value_net, 
+                market_params=market_params,
+                norm_params=obs_norm_params
+            )
     
-    # print(f"EVALUATION: ITERATION {iter} - RL RETURN {mean_rl_return}, GVWY RETURN {mean_gvwy_return}")
-    # mean_returns_list.append(mean_rl_return)
-    # gvwy_returns_list.append(mean_gvwy_return)
-    # # zic_returns_list.append(mean_zic_return)
+    print(f"EVALUATION: ITERATION {iter} - RL RETURN {mean_rl_return}, GVWY RETURN {mean_gvwy_return}")
+    rl_returns_list.append(mean_rl_return)
+    gvwy_returns_list.append(mean_gvwy_return)
+    # zic_returns_list.append(mean_zic_return)
 
     # Policy evaluation
     stats, valid_loss_list, test_loss_list, value_net = train(
@@ -150,67 +142,37 @@ for iter in range(1, CONFIG['policy_improv']+1):
     market_params[3]['sellers'][1][2]['value_func'] = value_net
     market_params = tuple(market_params)
 
-    # value_loss = stats['v_loss']
-    # plt.plot(value_loss, mb, linewidth=1.0, label='Training Loss')
-    # plt.plot(valid_loss_list, mp, linewidth=1.0, label='Validation Loss')
-    # plt.title(f"Value Loss - Iteration {iter:02d}")
-    # plt.xlabel("Epoch")
-    # plt.legend()
-    # plt.savefig(f'value_loss_{iter:02d}.png')
-    # plt.close()
-    # # plt.show()
-
-    # Generate training data
-    train_obs, train_actions, train_rewards = generate_data(
-        total_eps=CONFIG['train_data_eps'], 
-        market_params=market_params, 
-        eps_file='episode_seller.csv',
-        norm_params=obs_norm_params,
-        value_net=value_net,
-        iter=iter
-    )
-
-    # Generate validation data using training normalization parameters
-    val_obs, val_actions, val_rewards = generate_data(
-        total_eps=CONFIG['val_data_eps'], 
-        market_params=market_params, 
-        eps_file='episode_seller.csv',
-        norm_params=obs_norm_params,
-        value_net=value_net
-    )
-
-    # Generate test data using training normalization parameters
-    test_obs, test_actions, test_rewards = generate_data(
-        total_eps=CONFIG['eval_data_eps'], 
-        market_params=market_params, 
-        eps_file='episode_seller.csv',
-        norm_params=obs_norm_params,
-        value_net=value_net
-    )
-
-    # Normalise training observations
-    train_obs, obs_norm_params = normalise_obs(train_obs)
-
-    # Normalise validation observations
-    val_obs, _ = normalise_obs(val_obs, obs_norm_params)
-
-    # Normalise testing observations
-    test_obs, _ = normalise_obs(test_obs, obs_norm_params)
-
-    # Calculate returns
-    train_G, _ = calculate_returns(train_rewards, gamma=0.5, norm_params=G_norm_params)
-    val_G, _ = calculate_returns(val_rewards, gamma=0.5, norm_params=G_norm_params)
-    test_G, _ = calculate_returns(test_rewards, gamma=0.5, norm_params=G_norm_params)
+    value_loss = stats['v_loss']
+    plt.plot(value_loss, mb, linewidth=1.0, label='Training Loss')
+    plt.plot(valid_loss_list, mp, linewidth=1.0, label='Validation Loss')
+    plt.title(f"Iteration {iter:02d}")
+    plt.xlabel("Epochs")
+    plt.legend()
+    plt.savefig(f'value_loss_{iter:02d}.png')
+    plt.close()
+    # plt.show()
 
 
 
 # Plotting
-plt.plot(mean_returns_list, mb, label='RL')
+plt.plot(rl_returns_list, mb, label='RL')
 # plt.plot(gvwy_returns_list, mp, label='GVWY')
 # plt.plot(zic_returns_list, '#03045e', label='ZIC')
 plt.legend()
 plt.xlabel('Iterations')
-plt.ylabel('Mean Returns')
-plt.title('Policy Improvement')
+plt.ylabel('Average Returns')
+# plt.title('Policy Improvement')
 plt.savefig('policy_improvement.png')
+# plt.show()
+plt.close()
+
+
+plt.plot(rl_returns_list, mb, label='RL')
+plt.plot(gvwy_returns_list, mp, label='GVWY')
+# plt.plot(zic_returns_list, '#03045e', label='ZIC')
+plt.legend()
+plt.xlabel('Iterations')
+plt.ylabel('Average Returns')
+# plt.title('Policy Improvement')
+plt.savefig('policy_improv_traders.png')
 # plt.show()
