@@ -287,10 +287,10 @@ def eval_mean_returns(num_trials, value_net, market_params, norm_params:tuple=(0
         with open('session_1_avg_balance.csv', 'r') as file:
             lines = file.readlines()
             last_line = lines[-1].strip().split(',')
-            gvwy_value = float(last_line[7])  # Assuming the value is in the 8th column (index 7)
+            gvwy_value = float(last_line[11])  # Assuming the value is in the 8th column (index 7)
             gvwy_return += gvwy_value
 
-            rl_value = float(last_line[11])
+            rl_value = float(last_line[7])
             rl_return += rl_value
 
             # zic_return += float(last_line[15])

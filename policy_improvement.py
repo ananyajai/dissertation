@@ -56,8 +56,8 @@ order_interval = 60
 order_schedule = {'sup': supply_schedule, 'dem': demand_schedule,
                 'interval': order_interval, 'timemode': 'drip-fixed'}
 # 'max_order_price': supply_schedule[0]['ranges'][0][1]
-sellers_spec = [('GVWY', 9), ('REINFORCE', 1, {'epsilon': 0.97, 'max_order_price': supply_schedule[0]['ranges'][0][1]})]
-buyers_spec = [('GVWY', 10)]
+sellers_spec = [('ZIC', 9), ('REINFORCE', 1, {'epsilon': 0.97, 'max_order_price': supply_schedule[0]['ranges'][0][1]})]
+buyers_spec = [('ZIC', 10)]
 
 
 trader_spec = {'sellers': sellers_spec, 'buyers': buyers_spec}
@@ -158,16 +158,17 @@ for iter in range(0, CONFIG['policy_improv']+1):
 plt.plot(rl_returns_list, mb)
 plt.xlabel('Iterations')
 plt.ylabel('Average Returns')
-plt.savefig('policy_improv_gvwys.png')
+plt.savefig('gpi_with_zic.png')
 # plt.show()
 plt.close()
 
 
 plt.plot(rl_returns_list, mb, label='RL')
-plt.plot(gvwy_returns_list, mp, label='GVWY')
+plt.plot(gvwy_returns_list, mp, label='ZIC')
 # plt.plot(zic_returns_list, '#03045e', label='ZIC')
 plt.legend()
 plt.xlabel('Iterations')
 plt.ylabel('Average Returns')
-plt.savefig('policy_improv_traders.png')
+plt.savefig('gpi_show_zic.png')
 # plt.show()
+
