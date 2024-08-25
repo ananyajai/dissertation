@@ -124,24 +124,24 @@ def bin_average(value, min_price=bse_sys_minprice, max_price=bse_sys_maxprice, b
     return int(bin_average)
 
 
-def get_discrete_state(type, lob, time, order):
-    best_bid = bin_average(lob['bids']['best'])
-    best_ask = bin_average(lob['asks']['best'])
-    worst_bid = bin_average(lob['bids']['worst'])
-    worst_ask = bin_average(lob['asks']['worst'])
-    avg_bid = bin_average(calc_average_price(lob['bids']['lob']))
-    avg_ask = bin_average(calc_average_price(lob['asks']['lob']))
+# def get_discrete_state(type, lob, time, order):
+#     best_bid = bin_average(lob['bids']['best'])
+#     best_ask = bin_average(lob['asks']['best'])
+#     worst_bid = bin_average(lob['bids']['worst'])
+#     worst_ask = bin_average(lob['asks']['worst'])
+#     avg_bid = bin_average(calc_average_price(lob['bids']['lob']))
+#     avg_ask = bin_average(calc_average_price(lob['asks']['lob']))
 
-    # observation = np.array([type, float(int(time)), float(order), 
-    #                         float(best_bid), float(best_ask), float(worst_bid), 
-    #                         float(worst_ask), float(avg_bid), float(avg_ask)])
+#     # observation = np.array([type, float(int(time)), float(order), 
+#     #                         float(best_bid), float(best_ask), float(worst_bid), 
+#     #                         float(worst_ask), float(avg_bid), float(avg_ask)])
 
-    # observation = np.array([type, float(order), float(best_bid), float(best_ask), float(worst_bid), 
-    #                         float(worst_ask), float(avg_bid), float(avg_ask)])
+#     # observation = np.array([type, float(order), float(best_bid), float(best_ask), float(worst_bid), 
+#     #                         float(worst_ask), float(avg_bid), float(avg_ask)])
 
-    observation = np.array([type, float(order), float(best_bid), float(best_ask), float(avg_bid), float(avg_ask)])
+#     observation = np.array([type, float(order), float(best_bid), float(best_ask), float(avg_bid), float(avg_ask)])
     
-    return observation
+#     return observation
 
 
 def get_state(type, lob, time, order, countdown):
@@ -1945,7 +1945,7 @@ class RLAgent(Trader):
         self.current_obs = None
         self.old_balance = 0
 
-        # Initialize file to write obs, action, rewards
+        # Initialise file to write obs, action, rewards
         if self.type == 'Buyer':
             file = 'episode_buyer.csv'
         elif self.type == 'Seller':
@@ -2034,31 +2034,6 @@ class RLAgent(Trader):
         return self.q_table
 
 
-    def q_learn(
-        self, obs: int, action: int, reward: float, n_obs: int, done: bool
-    ) -> float:
-        """Implements the Q-Learning method and updates 
-        the Q-table based on agent experience.
-
-        :param obs (int): received observation representing the current environmental state
-        :param action (int): index of applied action
-        :param reward (float): received reward
-        :param n_obs (int): received observation representing the next environmental state
-        :param done (bool): flag indicating whether a terminal state has been reached
-        :return (float): updated Q-value for current observation-action pair
-        """
-        # Best action for the next state
-        a_ = np.argmax([self.q_table[(n_obs, a)] for a in range(self.num_actions)])
-
-        # Update Q-value using Q-learning update rule
-        self.q_table[(obs, action)] += (
-            self.alpha * (reward + self.gamma * self.q_table[(n_obs, a_)] * (1 - done) - self.q_table[(obs, action)])
-            )
-
-        obs = n_obs
-
-        return self.q_table[(obs, action)]
-
     
     def getorder(self, time, countdown, lob):     
         self.num_actions = len(self.action_space)
@@ -2145,7 +2120,7 @@ class RLAgent(Trader):
     
 
 
-class Reinforce(RLAgent):
+class Trader_Deep_RL(RLAgent):
     def __init__(
             self,
             ttype, 
@@ -2156,16 +2131,15 @@ class Reinforce(RLAgent):
             action_space: spaces.Space, 
             obs_space: spaces.Space, 
             learning_rate, 
-            gamma=1.0, 
+            gamma=0.3, 
             epsilon=0.9,
     ):
         
         super().__init__(ttype, tid, balance, params, time, action_space, obs_space, gamma, epsilon)
-        self.state_size = 15
+        self.state_size = self.obs_space.n
         self.action_size = self.action_space.n
         self.learning_rate = learning_rate
         
-        self.max_length = 0
         self.max_order_price = bse_sys_maxprice/2
         self.max_bse_price = bse_sys_maxprice
         
@@ -2187,41 +2161,6 @@ class Reinforce(RLAgent):
         profit_upperbound = (self.max_bse_price / self.max_order_price) - 1
         # Calculate step size based on upper bound and number of actions
         self.profit_stepsize = profit_upperbound/(self.action_size - 1)
-
-
-    def preprocess_lob(self, lob: Dict) -> np.ndarray:
-        """
-        Converts the LOB dictionary into a 3D numpy array with shape 
-        (2, max_length, 2). The first dimension corresponds to bids and 
-        asks, and the last dimension corresponds to price and quantity.
-        """
-        bids = lob['bids']['lob']
-        asks = lob['asks']['lob']
-
-        # Adjust the max_length if we encounter larger lists
-        # self.max_length = max(self.max_length, len(bids), len(asks))
-        self.max_length = 10
-
-        # Initialize a 3D numpy array for bids and asks
-        lob_array = np.zeros((2, self.max_length, 2), dtype=np.float32)
-
-        # Fill the bids section of the array
-        padded_bids = self.pad_lob(bids, self.max_length)
-        lob_array[0] = np.array(padded_bids, dtype=np.float32)
-
-        # Fill the asks section of the array
-        padded_asks = self.pad_lob(asks, self.max_length)
-        lob_array[1] = np.array(padded_asks, dtype=np.float32)
-
-        return lob_array
-    
-
-    def pad_lob(self, lob_list: List[List[int]], max_length: int) -> List[List[int]]:
-        """
-        Pads the LOB list with zeros to ensure it has the same length.
-        """
-        padded_lob = lob_list + [[0.0, 0.0]] * (max_length - len(lob_list))
-        return padded_lob[:max_length]
     
 
     def normalise_state(self, state: np.ndarray) -> np.ndarray:
@@ -2237,6 +2176,18 @@ class Reinforce(RLAgent):
 
 
     def q_value_function(self, state, action):
+        """
+        Compute the Q-value for a given state-action pair using the Q-network.
+
+        Args:
+            state (torch.Tensor): A tensor representing the current state. 
+                        The shape should be compatible with the input of the Q-network.
+            action (int): The index representing the action taken. 
+                        Should be an integer in the range [0, action_size-1].
+
+        Returns:
+            float: The estimated Q-value for the given state-action pair.
+        """
         action_one_hot = torch.zeros(self.action_size)
         action_one_hot[action] = 1
         state_action = torch.cat([state, action_one_hot])
@@ -2350,9 +2301,6 @@ def trade_stats(expid, traders, dumpfile, time, lob):
 def populate_market(traders_spec, traders, shuffle, verbose):
     # traders_spec is a list of buyer-specs and a list of seller-specs
     # each spec is (<trader type>, <number of this type of trader>, optionally: <params for this type of trader>)
-    
-    # # Load the Q-table from the CSV file
-    # q_table = RLAgent.load_q_table(q_table_file)
 
     def trader_type(robottype, name, parameters):
         balance = 0.00
@@ -2379,10 +2327,11 @@ def populate_market(traders_spec, traders, shuffle, verbose):
             return RLAgent('RL', name, balance, parameters, time0, 
                            action_space=[0.0], 
                            obs_space=spaces.MultiDiscrete([120, 100, 10, 10, 10, 10, 10, 10]))
-        elif robottype == 'REINFORCE':
-            return Reinforce('REINFORCE', name, balance, parameters, time0, 
-                           action_space=spaces.Discrete(50), learning_rate=1e-3,
-                           obs_space=spaces.Box(low=0, high=np.inf, shape=(2, 10, 2), dtype=np.float32))
+        elif robottype == 'DRL':
+            return Trader_Deep_RL('DRL', name, balance, parameters, time0, 
+                           action_space=spaces.Discrete(50),
+                           obs_space=spaces.Discrete(15),
+                           learning_rate=1e-3)
         else:
             sys.exit('FATAL: don\'t know robot type %s\n' % robottype)
 
@@ -2439,7 +2388,7 @@ def populate_market(traders_spec, traders, shuffle, verbose):
                 q_table_seller = trader_params['q_table_seller']
                 parameters['q_table_seller'] = q_table_seller
 
-        if ttype == 'REINFORCE':
+        if ttype == 'DRL':
             epsilon = trader_params.get('epsilon', 0.9)
             parameters = {'epsilon': epsilon}
             parameters['max_order_price'] = trader_params.get('max_order_price', bse_sys_maxprice/2)
@@ -2919,7 +2868,7 @@ if __name__ == "__main__":
     n_days = 10
     start_time = 0.0
     # end_time = 60.0 * 60.0 * 24 * n_days
-    end_time = 15.0
+    end_time = 100.0
     duration = end_time - start_time
 
     # schedule_offsetfn returns time-dependent offset, to be added to schedule prices
@@ -2992,7 +2941,7 @@ if __name__ == "__main__":
 
         # buyers_spec = [('SHVR', 5), ('GVWY', 5), ('ZIC', 5), ('ZIP', 5)]
         # sellers_spec = [('SHVR', 5), ('GVWY', 5), ('ZIC', 5), ('ZIP', 5), ('RL', 1, {'q_table_seller': 'q_table_seller.csv', 'epsilon': 0.9})]
-        sellers_spec = [('SHVR', 1), ('GVWY', 1), ('ZIC', 1), ('ZIP', 1), ('REINFORCE', 1, {'max_order_price': supply_schedule[0]['ranges'][0][1]})]
+        sellers_spec = [('SHVR', 1), ('GVWY', 1), ('ZIC', 1), ('ZIP', 1), ('DRL', 1, {'max_order_price': supply_schedule[0]['ranges'][0][1]})]
         buyers_spec = [('SHVR', 1), ('GVWY', 1), ('ZIC', 1), ('ZIP', 1)]
 
         traders_spec = {'sellers': sellers_spec, 'buyers': buyers_spec}

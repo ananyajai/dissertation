@@ -22,9 +22,9 @@ import torch.nn.functional as F
 CONFIG = {
     "total_eps": 50,
     "eval_freq": 1,
-    "train_data_eps": 5000,
-    "val_data_eps": 4000,
-    "eval_data_eps": 3000,
+    "train_data_eps": 50,
+    "val_data_eps": 40,
+    "eval_data_eps": 30,
     "gamma": 0.8,
     "epsilon": 1.0,
     "batch_size": 32
@@ -38,8 +38,8 @@ mp = '#d43d51'
 # Define the value function neural network
 state_size = 15
 action_size = 50
-# value_net = Network(dims=(state_size+action_size, 32, 32, 32, 1), output_activation=None)
-# value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
+value_net = Network(dims=(state_size+action_size, 32, 32, 32, 1), output_activation=None)
+value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
 # Define market parameters
 sess_id = 'session_1'
@@ -63,7 +63,7 @@ order_interval = 60
 order_schedule = {'sup': supply_schedule, 'dem': demand_schedule,
                 'interval': order_interval, 'timemode': 'drip-fixed'}
 
-sellers_spec = [('GVWY', 9), ('REINFORCE', 1, {'epsilon': 1.0})]
+sellers_spec = [('GVWY', 9), ('DRL', 1, {'epsilon': 1.0})]
 buyers_spec = [('GVWY', 10)]
 
 trader_spec = {'sellers': sellers_spec, 'buyers': buyers_spec}
@@ -174,8 +174,12 @@ def train(
         val_obs, val_actions, val_G,
         test_obs, test_actions, test_G,
         epochs: int, eval_freq: int,
-        value_net, value_optim, batch_size: int=32,
+        value_net, value_optim
     ) -> DefaultDict:
+    """
+    Trains the value network using provided training data and evaluates 
+    the model on validation and test sets at specified intervals.
+    """
 
     # Dictionary to store training statistics
     stats = defaultdict(list)
@@ -211,7 +215,7 @@ def train(
             validation_loss = evaluate(
                 val_obs, val_actions, val_G, value_net=value_net
             )
-            # print(f"VALIDATION: EPOCH {iteration} - VALUE LOSS {validation_loss}")
+            print(f"VALIDATION: EPOCH {iteration} - VALUE LOSS {validation_loss}")
             valid_loss_list.append(validation_loss)
 
             early_stop = EarlyStopping()
@@ -222,7 +226,7 @@ def train(
             testing_loss = evaluate(
                 test_obs, test_actions, test_G, value_net=value_net
             )
-            # tqdm.write(f"TESTING: EPOCH {iteration} - VALUE LOSS {testing_loss}")
+            print(f"TESTING: EPOCH {iteration} - VALUE LOSS {testing_loss}")
             test_loss_list.append(testing_loss)
 
     return stats, valid_loss_list, test_loss_list, value_net
@@ -315,61 +319,60 @@ def eval_mean_returns(num_trials, value_net, market_params, norm_params:tuple=(0
     return mean_rl_return, mean_gvwy_return
 
 
-# # Generate training data and normalization parameters
-# train_obs, train_actions, train_rewards = generate_data(
-#     total_eps=CONFIG['train_data_eps'], 
-#     market_params=market_params, 
-#     eps_file='episode_seller.csv'
-# )
+# Generate training data and normalization parameters
+train_obs, train_actions, train_rewards = generate_data(
+    total_eps=CONFIG['train_data_eps'], 
+    market_params=market_params, 
+    eps_file='episode_seller.csv'
+)
 
-# # Generate validation data using training normalization parameters
-# val_obs, val_actions, val_rewards = generate_data(
-#     total_eps=CONFIG['val_data_eps'], 
-#     market_params=market_params, 
-#     eps_file='episode_seller.csv'
-# )
+# Generate validation data using training normalization parameters
+val_obs, val_actions, val_rewards = generate_data(
+    total_eps=CONFIG['val_data_eps'], 
+    market_params=market_params, 
+    eps_file='episode_seller.csv'
+)
 
-# # Generate test data using training normalization parameters
-# test_obs, test_actions, test_rewards = generate_data(
-#     total_eps=CONFIG['eval_data_eps'], 
-#     market_params=market_params, 
-#     eps_file='episode_seller.csv'
-# )
+# Generate test data using training normalization parameters
+test_obs, test_actions, test_rewards = generate_data(
+    total_eps=CONFIG['eval_data_eps'], 
+    market_params=market_params, 
+    eps_file='episode_seller.csv'
+)
 
-# # Normalise training observations
-# train_obs, obs_norm_params = normalise_obs(train_obs)
+# Normalise training observations
+train_obs, obs_norm_params = normalise_obs(train_obs)
 
-# # Normalise validation observations
-# val_obs, _ = normalise_obs(val_obs, obs_norm_params)
+# Normalise validation observations
+val_obs, _ = normalise_obs(val_obs, obs_norm_params)
 
-# # Normalise testing observations
-# test_obs, _ = normalise_obs(test_obs, obs_norm_params)
+# Normalise testing observations
+test_obs, _ = normalise_obs(test_obs, obs_norm_params)
 
-# # Calculate returns
-# train_G, G_norm_params = calculate_returns(train_rewards, gamma=0.4)
-# val_G, _ = calculate_returns(val_rewards, gamma=0.4, norm_params=G_norm_params)
-# test_G, _ = calculate_returns(test_rewards, gamma=0.4, norm_params=G_norm_params)
+# Calculate returns
+train_G, G_norm_params = calculate_returns(train_rewards, gamma=0.4)
+val_G, _ = calculate_returns(val_rewards, gamma=0.4, norm_params=G_norm_params)
+test_G, _ = calculate_returns(test_rewards, gamma=0.4, norm_params=G_norm_params)
 
-# # Train the value function
-# stats, valid_loss_list, test_loss_list, value_net = train(
-#         train_obs, train_actions, train_G,
-#         val_obs, val_actions, val_G,
-#         test_obs, test_actions, test_G,
-#         epochs=CONFIG['total_eps'],
-#         eval_freq=CONFIG["eval_freq"],
-#         value_net=value_net, value_optim=value_optim,
-#         batch_size=CONFIG["batch_size"]
-#     )
+# Train the value function
+stats, valid_loss_list, test_loss_list, value_net = train(
+        train_obs, train_actions, train_G,
+        val_obs, val_actions, val_G,
+        test_obs, test_actions, test_G,
+        epochs=CONFIG['total_eps'],
+        eval_freq=CONFIG["eval_freq"],
+        value_net=value_net, value_optim=value_optim
+)
 
-# value_loss = stats['v_loss']
-# plt.plot(value_loss, mb, linewidth=1.0, label='Training Loss')
-# plt.plot(valid_loss_list, mp, linewidth=1.0, label='Validation Loss')
-# plt.title(f"Value Loss")
-# plt.xlabel("Epoch")
-# plt.legend()
-# # plt.savefig("training_valid_loss.png")
-# # plt.close()
-# plt.show()
+value_loss = stats['v_loss']
+plt.plot(value_loss, mb, linewidth=1.0, label='Training Loss')
+plt.plot(valid_loss_list, mp, linewidth=1.0, label='Validation Loss')
+plt.title(f"Value Loss")
+plt.xlabel("Epoch")
+plt.legend()
+# plt.savefig("training_valid_loss.png")
+# plt.close()
+plt.show()
 
 # # x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps'] + 1, CONFIG['eval_freq'])
 # # plt.plot(x_ticks, valid_loss_list, linewidth=1.0)
@@ -434,8 +437,7 @@ def eval_mean_returns(num_trials, value_net, market_params, norm_params:tuple=(0
 #             test_obs, test_actions, test_G,
 #             epochs=CONFIG['total_eps'],
 #             eval_freq=CONFIG["eval_freq"],
-#             value_net=value_net, value_optim=value_optim,
-#             batch_size=CONFIG["batch_size"]
+#             value_net=value_net, value_optim=value_optim
 #         )
 
 #     value_loss = stats['v_loss']

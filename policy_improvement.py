@@ -25,7 +25,7 @@ CONFIG = {
     "train_data_eps": 3500,
     "val_data_eps": 1000,
     "eval_data_eps": 500,
-    "policy_improv": 10,
+    "policy_improv": 30,
     "epsilon": 1.0,
     "batch_size": 64
 }
@@ -56,7 +56,7 @@ order_interval = 60
 order_schedule = {'sup': supply_schedule, 'dem': demand_schedule,
                 'interval': order_interval, 'timemode': 'drip-fixed'}
 # 'max_order_price': supply_schedule[0]['ranges'][0][1]
-sellers_spec = [('ZIC', 9), ('REINFORCE', 1, {'epsilon': 0.97, 'max_order_price': supply_schedule[0]['ranges'][0][1]})]
+sellers_spec = [('ZIC', 9), ('DRL', 1, {'epsilon': 0.97, 'max_order_price': supply_schedule[0]['ranges'][0][1]})]
 buyers_spec = [('ZIC', 10)]
 
 
@@ -108,13 +108,13 @@ for iter in range(0, CONFIG['policy_improv']+1):
     test_obs, _ = normalise_obs(test_obs, obs_norm_params)
 
     # Calculate returns
-    train_G, G_norm_params = calculate_returns(train_rewards, gamma=0.3)
-    val_G, _ = calculate_returns(val_rewards, gamma=0.3, norm_params=G_norm_params)
-    test_G, _ = calculate_returns(test_rewards, gamma=0.3, norm_params=G_norm_params)
+    train_G, G_norm_params = calculate_returns(train_rewards, gamma=0.7)
+    val_G, _ = calculate_returns(val_rewards, gamma=0.7, norm_params=G_norm_params)
+    test_G, _ = calculate_returns(test_rewards, gamma=0.7, norm_params=G_norm_params)
 
     # Policy improvement
     mean_rl_return, mean_gvwy_return = eval_mean_returns(
-                num_trials=10000, value_net=value_net, 
+                num_trials=5000, value_net=value_net, 
                 market_params=market_params,
                 norm_params=obs_norm_params
             )
@@ -131,8 +131,7 @@ for iter in range(0, CONFIG['policy_improv']+1):
         test_obs, test_actions, test_G,
         epochs=CONFIG['num_epochs'],
         eval_freq=CONFIG["eval_freq"],
-        value_net=value_net, value_optim=value_optim,
-        batch_size=CONFIG["batch_size"]
+        value_net=value_net, value_optim=value_optim
     )
 
     # Update epsilon value using linear decay
@@ -158,7 +157,7 @@ for iter in range(0, CONFIG['policy_improv']+1):
 plt.plot(rl_returns_list, mb)
 plt.xlabel('Iterations')
 plt.ylabel('Average Returns')
-plt.savefig('gpi_with_zic.png')
+plt.savefig('gpi_with_zic02.png')
 # plt.show()
 plt.close()
 
@@ -169,6 +168,6 @@ plt.plot(gvwy_returns_list, mp, label='ZIC')
 plt.legend()
 plt.xlabel('Iterations')
 plt.ylabel('Average Returns')
-plt.savefig('gpi_show_zic.png')
+plt.savefig('gpi_show_zic02.png')
 # plt.show()
 

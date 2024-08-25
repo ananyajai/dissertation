@@ -64,7 +64,7 @@ order_interval = 60
 order_schedule = {'sup': supply_schedule, 'dem': demand_schedule,
                 'interval': order_interval, 'timemode': 'drip-fixed'}
 
-sellers_spec = [('GVWY', 19), ('REINFORCE', 1, {'epsilon': 1.0, 'max_order_price': supply_schedule[0]['ranges'][0][1]})]
+sellers_spec = [('GVWY', 19), ('DRL', 1, {'epsilon': 1.0, 'max_order_price': supply_schedule[0]['ranges'][0][1]})]
 buyers_spec = [('GVWY', 20)]
 
 trader_spec = {'sellers': sellers_spec, 'buyers': buyers_spec}
@@ -75,7 +75,10 @@ verbose = False
 market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose)
 
 
-def generate_data(total_eps: int, market_params: tuple, eps_file: str, value_net, gamma: float, norm_params=None) -> Tuple[List, List, List]:
+def generate_TD_data(
+        total_eps: int, market_params: tuple, eps_file: str, 
+        value_net, gamma: float, norm_params=None
+    ) -> Tuple[List, List, List]:
     """
     Generates training data by running market session total_eps times.
 
@@ -85,10 +88,10 @@ def generate_data(total_eps: int, market_params: tuple, eps_file: str, value_net
         eps_file (str): File path where the output of each market session is stored.
         value_net (nn.Module): The neural network model representing the Q-function.
         gamma (float): Discount factor.
-        norm_params (tuple): Normalization parameters (obs_mean, obs_std, q_mean, q_std).
+        norm_params (tuple): Normalisation parameters (obs_mean, obs_std, q_mean, q_std).
 
     Returns:
-        Tuple: Normalized observations, actions, and target Q-values.
+        Tuple: Normalised observations, actions, and normalised target Q-values.
     """
     obs_list, action_list, q_list = [], [], []
 
@@ -130,7 +133,7 @@ def generate_data(total_eps: int, market_params: tuple, eps_file: str, value_net
     action_array = np.array(action_list)
     q_array = np.array(q_list)
 
-    # Determine normalization parameters if they aren't provided
+    # Determine normalisation parameters if they aren't provided
     if norm_params is None:
         obs_mean = np.mean(obs_array, axis=0)
         obs_std = np.std(obs_array, axis=0) + 1e-10
@@ -284,19 +287,19 @@ def eval_mean_returns(num_trials, value_net, market_params, model_path:str = 'va
 
 
 # # Generate training data and calculate normalization parameters
-# train_obs, train_actions, train_q, norm_params = generate_data(
+# train_obs, train_actions, train_q, norm_params = generate_TD_data(
 #     CONFIG['train_data_eps'], market_params, 'episode_seller.csv', 
 #     value_net, gamma=0.0
 # )
 
 # # Generate validation data using the same normalization parameters
-# val_obs, val_actions, val_q, _ = generate_data(
+# val_obs, val_actions, val_q, _ = generate_TD_data(
 #     CONFIG['val_data_eps'], market_params, 'episode_seller.csv', 
 #     value_net, gamma=0.0, norm_params=norm_params
 # )
 
 # # Generate testing data using the same normalization parameters
-# test_obs, test_actions, test_q, _ = generate_data(
+# test_obs, test_actions, test_q, _ = generate_TD_data(
 #     CONFIG['eval_data_eps'], market_params, 'episode_seller.csv', 
 #     value_net, gamma=0.0, norm_params=norm_params
 # )
@@ -343,13 +346,13 @@ mean_returns_list = []
 gvwy_returns_list = []
 
 # # Generate training data and calculate normalization parameters
-# train_obs, train_actions, train_q, norm_params = generate_data(CONFIG['train_data_eps'], market_params, 'episode_seller.csv', value_net, gamma=0.0)
+# train_obs, train_actions, train_q, norm_params = generate_TD_data(CONFIG['train_data_eps'], market_params, 'episode_seller.csv', value_net, gamma=0.0)
 
 # # Generate validation data using the same normalization parameters
-# val_obs, val_actions, val_q, _ = generate_data(CONFIG['val_data_eps'], market_params, 'episode_seller.csv', value_net, gamma=0.0, norm_params=norm_params)
+# val_obs, val_actions, val_q, _ = generate_TD_data(CONFIG['val_data_eps'], market_params, 'episode_seller.csv', value_net, gamma=0.0, norm_params=norm_params)
 
 # # Generate testing data using the same normalization parameters
-# test_obs, test_actions, test_q, _ = generate_data(CONFIG['eval_data_eps'], market_params, 'episode_seller.csv', value_net, gamma=0.0, norm_params=norm_params)
+# test_obs, test_actions, test_q, _ = generate_TD_data(CONFIG['eval_data_eps'], market_params, 'episode_seller.csv', value_net, gamma=0.0, norm_params=norm_params)
 
 # for iter in range(1, CONFIG['policy_improv']+1):
     
@@ -395,21 +398,21 @@ gvwy_returns_list = []
 #     # plt.show()
 
 #     # Generate training data and calculate normalization parameters
-#     train_obs, train_actions, train_q, _ = generate_data(
+#     train_obs, train_actions, train_q, _ = generate_TD_data(
 #         CONFIG['train_data_eps'], market_params, 
 #         'episode_seller.csv', value_net, 
 #         gamma=0.0, norm_params=norm_params
 #     )
 
 #     # Generate validation data using the same normalization parameters
-#     val_obs, val_actions, val_q, _ = generate_data(
+#     val_obs, val_actions, val_q, _ = generate_TD_data(
 #         CONFIG['val_data_eps'], market_params, 
 #         'episode_seller.csv', value_net, 
 #         gamma=0.0, norm_params=norm_params
 #     )
 
 #     # Generate testing data using the same normalization parameters
-#     test_obs, test_actions, test_q, _ = generate_data(
+#     test_obs, test_actions, test_q, _ = generate_TD_data(
 #         CONFIG['eval_data_eps'], market_params, 
 #         'episode_seller.csv', value_net, 
 #         gamma=0.0, norm_params=norm_params
@@ -455,19 +458,19 @@ for i, gamma in enumerate(gamma_list):
     value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
     # Generate training data and calculate normalisation parameters
-    train_obs, train_actions, train_q, norm_params = generate_data(
+    train_obs, train_actions, train_q, norm_params = generate_TD_data(
         CONFIG['train_data_eps'], market_params, 'episode_seller.csv', 
         value_net, gamma=gamma
     )
 
     # Generate validation data using the same normalisation parameters
-    val_obs, val_actions, val_q, _ = generate_data(
+    val_obs, val_actions, val_q, _ = generate_TD_data(
         CONFIG['val_data_eps'], market_params, 'episode_seller.csv', 
         value_net, gamma=gamma, norm_params=norm_params
     )
 
     # Generate testing data using the same normalisation parameters
-    test_obs, test_actions, test_q, _ = generate_data(
+    test_obs, test_actions, test_q, _ = generate_TD_data(
         CONFIG['eval_data_eps'], market_params, 'episode_seller.csv', 
         value_net, gamma=gamma, norm_params=norm_params
     )
