@@ -18,12 +18,12 @@ import torch.nn.functional as F
 
 
 CONFIG = {
-    "total_eps": 50,
+    "total_eps": 20,
     "eval_freq": 1,
     "train_data_eps": 3500,
     "val_data_eps": 1000,
     "eval_data_eps": 500,
-    "policy_improv": 5,
+    "policy_improv": 10,
     "epsilon": 1.0,
     "batch_size": 128
 }
@@ -64,8 +64,8 @@ order_interval = 60
 order_schedule = {'sup': supply_schedule, 'dem': demand_schedule,
                 'interval': order_interval, 'timemode': 'drip-fixed'}
 
-sellers_spec = [('GVWY', 19), ('DRL', 1, {'epsilon': 1.0, 'max_order_price': supply_schedule[0]['ranges'][0][1]})]
-buyers_spec = [('GVWY', 20)]
+sellers_spec = [('ZIC', 9), ('DRL', 1, {'epsilon': 1.0, 'max_order_price': supply_schedule[0]['ranges'][0][1]})]
+buyers_spec = [('ZIC', 10)]
 
 trader_spec = {'sellers': sellers_spec, 'buyers': buyers_spec}
 
@@ -257,7 +257,7 @@ def evaluate(
     return total_value_loss
 
 
-def eval_mean_returns(num_trials, value_net, market_params, model_path:str = 'value_net_checkpoint.pt'):
+def eval_mean_returns(num_trials, value_net, market_params, norm_params:tuple=(0, 1), model_path:str = 'value_net_checkpoint.pt'):
     value_net.load_state_dict(torch.load(model_path))
     value_net.eval()
 
@@ -267,6 +267,7 @@ def eval_mean_returns(num_trials, value_net, market_params, model_path:str = 'va
     updated_market_params = list(market_params)    
     updated_market_params[3]['sellers'][1][2]['value_func'] = value_net
     updated_market_params[3]['sellers'][1][2]['epsilon'] = 0.0         # No exploring
+    updated_market_params[3]['sellers'][1][2]['norm_params'] = norm_params
 
     for _ in range(num_trials):
         market_session(*updated_market_params)
@@ -274,10 +275,10 @@ def eval_mean_returns(num_trials, value_net, market_params, model_path:str = 'va
         with open('session_1_avg_balance.csv', 'r') as file:
             lines = file.readlines()
             last_line = lines[-1].strip().split(',')
-            gvwy_value = float(last_line[7])  # Assuming the value is in the 8th column (index 7)
+            gvwy_value = float(last_line[11])  
             gvwy_return += gvwy_value
 
-            rl_value = float(last_line[11])
+            rl_value = float(last_line[7])
             rl_return += rl_value
             
     mean_rl_return = rl_return / num_trials
@@ -286,24 +287,91 @@ def eval_mean_returns(num_trials, value_net, market_params, model_path:str = 'va
     return mean_rl_return, mean_gvwy_return
 
 
-# # Generate training data and calculate normalization parameters
-# train_obs, train_actions, train_q, norm_params = generate_TD_data(
-#     CONFIG['train_data_eps'], market_params, 'episode_seller.csv', 
-#     value_net, gamma=0.0
-# )
+rl_returns_list = []
+gvwy_returns_list = []
 
-# # Generate validation data using the same normalization parameters
-# val_obs, val_actions, val_q, _ = generate_TD_data(
-#     CONFIG['val_data_eps'], market_params, 'episode_seller.csv', 
-#     value_net, gamma=0.0, norm_params=norm_params
-# )
+value_net = Network(dims=(state_size+action_size, 32, 32, 32, 1), output_activation=None)
+value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
-# # Generate testing data using the same normalization parameters
-# test_obs, test_actions, test_q, _ = generate_TD_data(
-#     CONFIG['eval_data_eps'], market_params, 'episode_seller.csv', 
-#     value_net, gamma=0.0, norm_params=norm_params
-# )
+for iter in range(0, CONFIG['policy_improv']+1):
+    print(f"GPI - {iter}")
 
+    # Generate training data and calculate normalization parameters
+    train_obs, train_actions, train_q, norm_params = generate_TD_data(
+        CONFIG['train_data_eps'], market_params, 'episode_seller.csv', 
+        value_net, gamma=0.0
+    )
+
+    # Generate validation data using the same normalization parameters
+    val_obs, val_actions, val_q, _ = generate_TD_data(
+        CONFIG['val_data_eps'], market_params, 'episode_seller.csv', 
+        value_net, gamma=0.0, norm_params=norm_params
+    )
+
+    # Generate testing data using the same normalization parameters
+    test_obs, test_actions, test_q, _ = generate_TD_data(
+        CONFIG['eval_data_eps'], market_params, 'episode_seller.csv', 
+        value_net, gamma=0.0, norm_params=norm_params
+    )
+
+    # Policy improvement
+    mean_rl_return, mean_gvwy_return = eval_mean_returns(
+                num_trials=10000, value_net=value_net, 
+                market_params=market_params,
+                norm_params=norm_params[:2]
+            )
+    
+    print(f"EVALUATION: ITERATION {iter} - RL RETURN {mean_rl_return}, GVWY RETURN {mean_gvwy_return}")
+    rl_returns_list.append(mean_rl_return)
+    gvwy_returns_list.append(mean_gvwy_return)
+    # zic_returns_list.append(mean_zic_return)
+
+    # Train the value function
+    stats, valid_loss_list, test_loss_list, value_net = train(
+        train_obs, train_actions, train_q,
+        val_obs, val_actions, val_q,
+        test_obs, test_actions, test_q,
+        epochs=CONFIG['total_eps'],
+        eval_freq=CONFIG["eval_freq"],
+        value_net=value_net, value_optim=value_optim,
+        batch_size=CONFIG["batch_size"]
+    )
+
+    # Update epsilon value using linear decay
+    epsilon = linear_epsilon_decay(iter, CONFIG['policy_improv'])
+    market_params = list(market_params)    
+    market_params[3]['sellers'][1][2]['epsilon'] = epsilon
+    market_params[3]['sellers'][1][2]['value_func'] = value_net
+    market_params = tuple(market_params)
+
+    value_loss = stats['v_loss']
+    plt.plot(value_loss, mb, linewidth=1.0, label='Training Loss')
+    plt.plot(valid_loss_list, mp, linewidth=1.0, label='Validation Loss')
+    plt.title(f"Iteration {iter:02d}")
+    plt.xlabel("Epochs")
+    plt.legend()
+    plt.savefig(f'TD_value_loss_{iter:02d}.png')
+    plt.close()
+    # plt.show()
+
+
+# Plotting
+plt.plot(rl_returns_list, mb)
+plt.xlabel('Iterations')
+plt.ylabel('Average Returns')
+plt.savefig('TD_gpi_with_zic.png')
+# plt.show()
+plt.close()
+
+
+plt.plot(rl_returns_list, mb, label='RL')
+plt.plot(gvwy_returns_list, mp, label='ZIC')
+# plt.plot(zic_returns_list, '#03045e', label='ZIC')
+plt.legend()
+plt.xlabel('Iterations')
+plt.ylabel('Average Returns')
+plt.savefig('TD_gpi_show_zic.png')
+# plt.show()
 
 # # Train the value function
 # stats, valid_loss_list, test_loss_list, value_net = train(
@@ -342,8 +410,8 @@ def eval_mean_returns(num_trials, value_net, market_params, model_path:str = 'va
 # # plt.close()
 # plt.show()
 
-mean_returns_list = []
-gvwy_returns_list = []
+# mean_returns_list = []
+# gvwy_returns_list = []
 
 # # Generate training data and calculate normalization parameters
 # train_obs, train_actions, train_q, norm_params = generate_TD_data(CONFIG['train_data_eps'], market_params, 'episode_seller.csv', value_net, gamma=0.0)
@@ -431,98 +499,98 @@ gvwy_returns_list = []
 # # plt.show()
 
 
-gamma_list = np.linspace(0, 1, 11)
+# gamma_list = np.linspace(0, 1, 11)
 
-# Set up the subplot grid
-fig_training, axs_training = plt.subplots(3, 4, figsize=(20, 15))
-fig_testing, axs_testing = plt.subplots(3, 4, figsize=(20, 15))
-# fig_validation, axs_validation = plt.subplots(3, 4, figsize=(20, 15))
-# fig_returns, axs_returns = plt.subplots(3, 4, figsize=(20, 15))
+# # Set up the subplot grid
+# fig_training, axs_training = plt.subplots(3, 4, figsize=(20, 15))
+# fig_testing, axs_testing = plt.subplots(3, 4, figsize=(20, 15))
+# # fig_validation, axs_validation = plt.subplots(3, 4, figsize=(20, 15))
+# # fig_returns, axs_returns = plt.subplots(3, 4, figsize=(20, 15))
 
-# Flatten the axes arrays for easy indexing
-axs_training = axs_training.flatten()
-axs_testing = axs_testing.flatten()
-# axs_validation = axs_validation.flatten()
-# axs_returns = axs_returns.flatten()
+# # Flatten the axes arrays for easy indexing
+# axs_training = axs_training.flatten()
+# axs_testing = axs_testing.flatten()
+# # axs_validation = axs_validation.flatten()
+# # axs_returns = axs_returns.flatten()
 
-# Remove the last subplot (12th) if not needed
-fig_training.delaxes(axs_training[-1])
-fig_testing.delaxes(axs_testing[-1])
-# fig_validation.delaxes(axs_validation[-1])
-# fig_returns.delaxes(axs_returns[-1])
+# # Remove the last subplot (12th) if not needed
+# fig_training.delaxes(axs_training[-1])
+# fig_testing.delaxes(axs_testing[-1])
+# # fig_validation.delaxes(axs_validation[-1])
+# # fig_returns.delaxes(axs_returns[-1])
 
-# Start training
-for i, gamma in enumerate(gamma_list):
-    # Reinitialise the neural network and optimizer for each gamma value
-    value_net = Network(dims=(state_size + action_size, 32, 32, 32, 1), output_activation=None)
-    value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
+# # Start training
+# for i, gamma in enumerate(gamma_list):
+#     # Reinitialise the neural network and optimizer for each gamma value
+#     value_net = Network(dims=(state_size + action_size, 32, 32, 32, 1), output_activation=None)
+#     value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 
-    # Generate training data and calculate normalisation parameters
-    train_obs, train_actions, train_q, norm_params = generate_TD_data(
-        CONFIG['train_data_eps'], market_params, 'episode_seller.csv', 
-        value_net, gamma=gamma
-    )
+#     # Generate training data and calculate normalisation parameters
+#     train_obs, train_actions, train_q, norm_params = generate_TD_data(
+#         CONFIG['train_data_eps'], market_params, 'episode_seller.csv', 
+#         value_net, gamma=gamma
+#     )
 
-    # Generate validation data using the same normalisation parameters
-    val_obs, val_actions, val_q, _ = generate_TD_data(
-        CONFIG['val_data_eps'], market_params, 'episode_seller.csv', 
-        value_net, gamma=gamma, norm_params=norm_params
-    )
+#     # Generate validation data using the same normalisation parameters
+#     val_obs, val_actions, val_q, _ = generate_TD_data(
+#         CONFIG['val_data_eps'], market_params, 'episode_seller.csv', 
+#         value_net, gamma=gamma, norm_params=norm_params
+#     )
 
-    # Generate testing data using the same normalisation parameters
-    test_obs, test_actions, test_q, _ = generate_TD_data(
-        CONFIG['eval_data_eps'], market_params, 'episode_seller.csv', 
-        value_net, gamma=gamma, norm_params=norm_params
-    )
+#     # Generate testing data using the same normalisation parameters
+#     test_obs, test_actions, test_q, _ = generate_TD_data(
+#         CONFIG['eval_data_eps'], market_params, 'episode_seller.csv', 
+#         value_net, gamma=gamma, norm_params=norm_params
+#     )
 
-    stats, valid_loss_list, test_loss_list, value_net = train(
-        train_obs, train_actions, train_q,
-        val_obs, val_actions, val_q,
-        test_obs, test_actions, test_q,
-        epochs=CONFIG['total_eps'],
-        eval_freq=CONFIG["eval_freq"],
-        value_net=value_net, value_optim=value_optim,
-        batch_size=CONFIG["batch_size"]
-    )
+#     stats, valid_loss_list, test_loss_list, value_net = train(
+#         train_obs, train_actions, train_q,
+#         val_obs, val_actions, val_q,
+#         test_obs, test_actions, test_q,
+#         epochs=CONFIG['total_eps'],
+#         eval_freq=CONFIG["eval_freq"],
+#         value_net=value_net, value_optim=value_optim,
+#         batch_size=CONFIG["batch_size"]
+#     )
 
-    value_loss = stats['v_loss']
+#     value_loss = stats['v_loss']
 
-    # # Plot mean return
-    # axs_returns[i].plot(mean_return_list, 'c', linewidth=1.0)
-    # axs_returns[i].set_title(f"Mean Return, γ={gamma:.1f}")
-    # axs_returns[i].set_xlabel("Iteration")
+#     # # Plot mean return
+#     # axs_returns[i].plot(mean_return_list, 'c', linewidth=1.0)
+#     # axs_returns[i].set_title(f"Mean Return, γ={gamma:.1f}")
+#     # axs_returns[i].set_xlabel("Iteration")
 
-    # Plot training loss
-    axs_training[i].plot(value_loss, mb, linewidth=1.0, label='Training Loss')
-    axs_training[i].plot(valid_loss_list, mp, linewidth=1.0, label='Validation Loss')
-    axs_training[i].set_title(f"γ={gamma:.1f}", fontsize=18)
-    axs_training[i].set_xlabel("Epochs", fontsize=16)
-    axs_training[i].set_ylabel("Loss", fontsize=16)
-    axs_training[i].legend()
+#     # Plot training loss
+#     axs_training[i].plot(value_loss, mb, linewidth=1.0, label='Training Loss')
+#     axs_training[i].plot(valid_loss_list, mp, linewidth=1.0, label='Validation Loss')
+#     axs_training[i].set_title(f"γ={gamma:.1f}", fontsize=18)
+#     axs_training[i].set_xlabel("Epochs", fontsize=16)
+#     axs_training[i].set_ylabel("Loss", fontsize=16)
+#     axs_training[i].legend()
 
-    # Plot testing loss
-    x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps'] + 1, CONFIG['eval_freq'])
-    axs_testing[i].plot(x_ticks, test_loss_list, '#03045e')
-    axs_testing[i].set_title(f"γ={gamma:.1f}", fontsize=18)
-    axs_testing[i].set_xlabel("Epochs", fontsize=16)
-    axs_testing[i].set_ylabel("Loss", fontsize=16)
+#     # Plot testing loss
+#     x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps'] + 1, CONFIG['eval_freq'])
+#     axs_testing[i].plot(x_ticks, test_loss_list, '#03045e')
+#     axs_testing[i].set_title(f"γ={gamma:.1f}", fontsize=18)
+#     axs_testing[i].set_xlabel("Epochs", fontsize=16)
+#     axs_testing[i].set_ylabel("Loss", fontsize=16)
 
-    # # Plot validation loss
-    # axs_validation[i].plot(x_ticks, valid_loss_list, 'g')
-    # axs_validation[i].set_title(f"Validation Loss, γ={gamma:.1f}")
-    # axs_validation[i].set_xlabel("Epoch")
-    # axs_validation[i].set_ylabel("Loss")
+#     # # Plot validation loss
+#     # axs_validation[i].plot(x_ticks, valid_loss_list, 'g')
+#     # axs_validation[i].set_title(f"Validation Loss, γ={gamma:.1f}")
+#     # axs_validation[i].set_xlabel("Epoch")
+#     # axs_validation[i].set_ylabel("Loss")
 
-# Adjust layout
-fig_training.tight_layout()
-# fig_returns.tight_layout()
-fig_testing.tight_layout()
-# fig_validation.tight_layout()
+# # Adjust layout
+# fig_training.tight_layout()
+# # fig_returns.tight_layout()
+# fig_testing.tight_layout()
+# # fig_validation.tight_layout()
 
-# # Save figures
-fig_training.savefig("TD_valid_loss_gammas.png")
-# # fig_returns.savefig("mean_return_gammas.png")
-fig_testing.savefig("TD_test_loss_gammas.png")
-# # fig_validation.savefig("validation_loss_gammas.png")
+# # # Save figures
+# fig_training.savefig("TD_valid_loss_gammas.png")
+# # # fig_returns.savefig("mean_return_gammas.png")
+# fig_testing.savefig("TD_test_loss_gammas.png")
+# # # fig_validation.savefig("validation_loss_gammas.png")
 
-# plt.show()
+# # plt.show()
