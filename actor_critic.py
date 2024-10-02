@@ -8,6 +8,7 @@ from collections import defaultdict
 from typing import List, Dict, DefaultDict, Tuple
 from epsilon_scheduling import linear_epsilon_decay
 from early_stopping import EarlyStopping
+from semi_gradient_TD import load_episode_data, generate_data, eval_mean_returns
 
 from neural_network import Network
 import torch
@@ -19,9 +20,9 @@ import torch.nn.functional as F
 CONFIG = {
     "total_eps": 10,
     "eval_freq": 1,
-    "train_data_eps": 2100,
-    "val_data_eps": 600,
-    "eval_data_eps": 300,
+    "train_data_eps": 100,
+    "val_data_eps": 20,
+    "eval_data_eps": 20,
     "policy_improv": 5,
     "epsilon": 1.0,
     "batch_size": 64
@@ -35,7 +36,7 @@ value_optim = Adam(value_net.parameters(), lr=1e-3, eps=1e-3)
 policy_net = Network(
     dims=(state_size, 32, 32, action_size), output_activation=nn.Softmax(dim=-1)
     )
-policy_optim = Adam(policy_net.parameters(), lr=1e-7, eps=1e-3, weight_decay=1e-4)
+policy_optim = Adam(policy_net.parameters(), lr=1e-3, eps=1e-3, weight_decay=1e-4)
 
 # colours = ['#085ea8', '#5379b7', '#7e95c5', '#a5b3d4', '#cbd1e2', 
 #            '#f1cfce', '#eeadad', '#e88b8d', '#df676e', '#d43d51']
@@ -73,98 +74,11 @@ verbose = False
 market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose)
 
 
-def generate_data(total_eps: int, market_params: tuple, eps_file: str, value_net, gamma: float) -> Tuple[List, List, List]:
-    """
-    Generates training data by running market session total_eps times.
-
-    Args:
-        total_eps (int): Total number of times to run market session.
-        market_params (tuple): Parameters for running market session.
-        eps_file (str): File path where the output of each market session is stored.
-        value_net (nn.Module): The neural network model representing the Q-function.
-        gamma (float): Discount factor.
-
-    Returns:
-        Tuple: Normalized observations, actions, and target Q-values.
-    """
-    obs_list, action_list, q_list = [], [], []
-
-    # Remove previous data files if they exist
-    try:
-        send2trash([eps_file])
-    except:
-        pass 
-    
-    for i in range(total_eps):
-        market_session(*market_params)
-        eps_obs, eps_actions, eps_rewards = load_episode_data(eps_file)
-        
-        for t in range(len(eps_rewards)):
-            obs = eps_obs[t]
-            action = eps_actions[t]
-            reward = eps_rewards[t]
-
-            # Calculate next_obs and next_action
-            if t == len(eps_rewards) - 1:
-                next_obs = None
-                next_action = None
-                q_t = reward  # No next state, so Q_t = R_t
-            else:
-                next_obs = eps_obs[t + 1]
-                next_action = eps_actions[t + 1]
-                
-                # Compute Q_tilda(s_t+1, a_t+1) using value_net
-                with torch.no_grad():
-                    flattened_next_obs = next_obs.flatten()
-                    one_hot_next_action = np.eye(action_size, dtype=int)[int(next_action)]
-                    next_state_action_pair = np.concatenate((flattened_next_obs, one_hot_next_action))
-                    next_state_action_tensor = torch.tensor(next_state_action_pair, dtype=torch.float32).unsqueeze(0)
-                    q_tilda = value_net(next_state_action_tensor).item()
-                
-                # Compute Q_t using the Bellman equation
-                q_t = reward + gamma * q_tilda
-            
-            obs_list.append(obs)
-            action_list.append(action)
-            q_list.append(q_t)
-
-    # Convert lists to numpy arrays
-    obs_array = np.array(obs_list)
-    action_array = np.array(action_list)
-    q_array = np.array(q_list)
-
-    # Normalize observations
-    obs_mean = np.mean(obs_array, axis=0)
-    obs_std = np.std(obs_array, axis=0) + 1e-10
-    normalised_obs = (obs_array - obs_mean) / obs_std
-
-    # Normalize Q-values
-    q_mean = np.mean(q_array)
-    q_std = np.std(q_array) + 1e-10
-    normalised_q = (q_array - q_mean) / q_std
-
-    return normalised_obs, action_array, normalised_q
-
-
-def load_episode_data(file: str) -> Tuple[List, List, List]:
-    obs_list, action_list, reward_list = [], [], []
-    
-    with open(file, 'r') as f:
-        reader = csv.reader(f)
-        next(reader)  # Skip the header
-        for row in reader:
-            obs_str = row[0].strip('()').split(", ")
-            obs_list.append(np.array([float(x.strip("'")) for x in obs_str]))        # Convert the string values to floats
-            action_list.append((float(row[1])))
-            reward_list.append(float(row[2]))
-
-    return obs_list, action_list, reward_list
-
 def train_actor_critic(
         train_obs, train_actions, train_q_values,
         val_obs, val_actions, val_q_values,
         test_obs, test_actions, test_q_values,
-        epochs: int, eval_freq: int, gamma: float,
+        epochs: int, eval_freq: int, gamma: float, norm_params: Tuple,
         policy_net, value_net, policy_optim, value_optim, 
         market_params, batch_size: int=32,
     ) -> DefaultDict:
@@ -228,17 +142,28 @@ def train_actor_critic(
             test_value_loss_list.append(testing_value_loss)
 
             mean_rl_return, mean_gvwy_return = eval_mean_returns(
-                10000, value_net, market_params, 
+                50, value_net, market_params, 
                 model_path='value_net_checkpoint.pt'
             )
             rl_return_list.append(mean_rl_return)
             gvwy_return_list.append(mean_gvwy_return)
 
-            # Generate new data based on the updated policy
-            train_obs, train_actions, train_q_values = generate_data(CONFIG['train_data_eps'],                                    
-              market_params=market_params,
-              eps_file='episode_seller.csv',
-              value_net=value_net, gamma=0.0
+            # Generate training data using the same normalisation parameters
+            train_obs, train_actions, train_q_values, _ = generate_data(
+                CONFIG['train_data_eps'], market_params, 'episode_seller.csv', 
+                value_net, gamma=0.0, norm_params=norm_params
+            )
+
+            # Generate validation data using the same normalissation parameters
+            val_obs, val_actions, val_q_values, _ = generate_data(
+                CONFIG['val_data_eps'], market_params, 'episode_seller.csv', 
+                value_net, gamma=0.0, norm_params=norm_params
+            )
+
+            # Generate testing data using the same normalisation parameters
+            test_obs, test_actions, test_q_values, _ = generate_data(
+                CONFIG['eval_data_eps'], market_params, 'episode_seller.csv', 
+                value_net, gamma=0.0, norm_params=norm_params
             )
 
             # Update epsilon value using linear decay
@@ -299,36 +224,6 @@ def update_actor_critic(
     return {"p_loss": float(policy_loss), "v_loss": float(value_loss)}
 
 
-def evaluate(
-        obs_list: List[np.ndarray], action_list: List[int], q_values_list: List[float], value_net
-    ) -> float:
-
-    # Compute the predicted Q-values using the value_net
-    predicted_q_values = []
-    with torch.no_grad():  # No gradient calculation needed during evaluation
-        for obs, action in zip(obs_list, action_list):
-            # Flatten observation and create one-hot encoding for action
-            flattened_obs = obs.flatten()
-            one_hot_action = np.eye(action_size, dtype=int)[int(action)]
-            
-            # Concatenate flattened observation with one-hot action
-            state_action_pair = np.concatenate((flattened_obs, one_hot_action))
-            
-            # Convert state-action pair to a tensor
-            obs_tensor = torch.tensor(state_action_pair, dtype=torch.float32).unsqueeze(0)
-
-            # Predict Q-value for the state-action pair
-            q_value = value_net(obs_tensor).item()
-            predicted_q_values.append(q_value)
-    
-    # Calculate value loss (MSE) between predicted and actual Q-values
-    predicted_q_tensor = torch.tensor(predicted_q_values, dtype=torch.float32)
-    q_values_tensor = torch.tensor(q_values_list, dtype=torch.float32)
-    value_loss = F.mse_loss(predicted_q_tensor, q_values_tensor)
-    total_value_loss = value_loss.item()
-
-    return total_value_loss
-
 def evaluate_policy(
         obs_list, action_list, reward_list, policy_net, value_net, gamma
     ) -> Tuple[float, float]:
@@ -368,56 +263,24 @@ def evaluate_policy(
     return policy_loss.item(), value_loss.item()
 
 
+# Generate training data and calculate normalization parameters
+train_obs, train_actions, train_q, norm_params = generate_data(
+    CONFIG['train_data_eps'], market_params, 
+    'episode_seller.csv', value_net, gamma=0.0
+)
 
-def eval_mean_returns(num_trials, value_net, market_params, model_path:str = 'value_net_checkpoint.pt'):
-    value_net.load_state_dict(torch.load(model_path))
-    value_net.eval()
+# Generate validation data using the same normalization parameters
+val_obs, val_actions, val_q, _ = generate_data(
+    CONFIG['val_data_eps'], market_params, 'episode_seller.csv', 
+    value_net, gamma=0.0, norm_params=norm_params
+)
 
-    rl_return = 0.0
-    gvwy_return = 0.0
+# Generate testing data using the same normalization parameters
+test_obs, test_actions, test_q, _ = generate_data(
+    CONFIG['eval_data_eps'], market_params, 'episode_seller.csv', 
+    value_net, gamma=0.0, norm_params=norm_params
+)
 
-    updated_market_params = list(market_params)    
-    updated_market_params[3]['sellers'][1][2]['value_func'] = value_net
-    updated_market_params[3]['sellers'][1][2]['epsilon'] = 0.0         # No exploring
-
-    for _ in range(num_trials):
-        market_session(*updated_market_params)
-
-        with open('session_1_avg_balance.csv', 'r') as file:
-            lines = file.readlines()
-            last_line = lines[-1].strip().split(',')
-            gvwy_value = float(last_line[7])  # Assuming the value is in the 8th column (index 7)
-            gvwy_return += gvwy_value
-
-            rl_value = float(last_line[11])
-            rl_return += rl_value
-            
-    mean_rl_return = rl_return / num_trials
-    mean_gvwy_return = gvwy_return / num_trials
-
-    return mean_rl_return, mean_gvwy_return
-
-
-# Generate training data
-train_obs, train_actions, train_q = generate_data(CONFIG['train_data_eps'],                                    
-              market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
-              eps_file='episode_seller.csv',
-              value_net=value_net, gamma=0.0
-              )
-
-# Generate validation data
-val_obs, val_actions, val_q = generate_data(CONFIG['val_data_eps'],                                                 
-              market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
-              eps_file='episode_seller.csv',
-              value_net=value_net, gamma=0.0 
-              )
-
-# Generate testing data
-test_obs, test_actions, test_q = generate_data(CONFIG['eval_data_eps'], 
-              market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose), 
-              eps_file='episode_seller.csv',
-              value_net=value_net, gamma=0.0
-              )
 
 # Train the value function
 stats, valid_policy_loss_list, valid_value_loss_list, test_policy_loss_list, test_value_loss_list, value_net, rl_return_list, gvwy_return_list = train_actor_critic(
@@ -426,65 +289,65 @@ stats, valid_policy_loss_list, valid_value_loss_list, test_policy_loss_list, tes
         test_obs, test_actions, test_q,
         epochs=CONFIG['total_eps'],
         eval_freq=CONFIG["eval_freq"],
-        gamma=0.2, 
+        gamma=0.2, norm_params=norm_params,
         policy_net=policy_net, value_net=value_net, 
         policy_optim=policy_optim, value_optim=value_optim,
         market_params=market_params, batch_size=CONFIG["batch_size"]
     )
 
-# print(f"Training Policy Loss: {stats['policy_loss']}")
-# print(f"Training Value Loss: {stats['value_loss']}")
-# print(f"Validation Policy Loss: {valid_policy_loss_list}")
-# print(f"Validation Value Loss: {valid_value_loss_list}")
-# print(f"Testing Policy Loss: {test_policy_loss_list}")
-# print(f"Testing Value Loss: {test_value_loss_list}")
-# print(f"RL Returns: {rl_return_list}")
-# print(f"GVWY Returns: {gvwy_return_list}")
+print(f"Training Policy Loss: {stats['policy_loss']}")
+print(f"Training Value Loss: {stats['value_loss']}")
+print(f"Validation Policy Loss: {valid_policy_loss_list}")
+print(f"Validation Value Loss: {valid_value_loss_list}")
+print(f"Testing Policy Loss: {test_policy_loss_list}")
+print(f"Testing Value Loss: {test_value_loss_list}")
+print(f"RL Returns: {rl_return_list}")
+print(f"GVWY Returns: {gvwy_return_list}")
 
-# # Plot training and validation losses for the policy network (actor)
-# plt.figure(figsize=(14, 6))
+# Plot training and validation losses for the policy network (actor)
+plt.figure(figsize=(14, 6))
 
-# plt.subplot(1, 2, 1)
-# plt.plot(stats['policy_loss'], 'c', linewidth=1.0, label='Training Policy Loss')
-# plt.plot(valid_policy_loss_list, 'g', linewidth=1.0, label='Validation Policy Loss')
-# plt.title("Policy (Actor) Loss")
-# plt.xlabel("Epoch")
-# plt.ylabel("Loss")
-# plt.legend()
+plt.subplot(1, 2, 1)
+plt.plot(stats['policy_loss'], 'c', linewidth=1.0, label='Training Policy Loss')
+plt.plot(valid_policy_loss_list, 'g', linewidth=1.0, label='Validation Policy Loss')
+plt.title("Policy (Actor) Loss")
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.legend()
 
-# # Plot training and validation losses for the value network (critic)
-# plt.subplot(1, 2, 2)
-# plt.plot(stats['value_loss'], 'c', linewidth=1.0, label='Training Value Loss')
-# plt.plot(valid_value_loss_list, 'g', linewidth=1.0, label='Validation Value Loss')
-# plt.title("Value (Critic) Loss")
-# plt.xlabel("Epoch")
-# plt.ylabel("Loss")
-# plt.legend()
+# Plot training and validation losses for the value network (critic)
+plt.subplot(1, 2, 2)
+plt.plot(stats['value_loss'], 'c', linewidth=1.0, label='Training Value Loss')
+plt.plot(valid_value_loss_list, 'g', linewidth=1.0, label='Validation Value Loss')
+plt.title("Value (Critic) Loss")
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.legend()
 
-# plt.tight_layout()
+plt.tight_layout()
 # plt.savefig("policy_valid_loss.png")
-# # plt.show()
+plt.show()
 
-# # Plot testing losses for both policy and value networks
-# plt.figure(figsize=(14, 6))
+# Plot testing losses for both policy and value networks
+plt.figure(figsize=(14, 6))
 
-# plt.subplot(1, 2, 1)
-# plt.plot(test_policy_loss_list, linewidth=1.0, label='Testing Policy Loss')
-# plt.title("Policy (Actor) Loss - Testing Data")
-# plt.xlabel("Epoch")
-# plt.ylabel("Loss")
-# plt.legend()
+plt.subplot(1, 2, 1)
+plt.plot(test_policy_loss_list, linewidth=1.0, label='Testing Policy Loss')
+plt.title("Policy (Actor) Loss - Testing Data")
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.legend()
 
-# plt.subplot(1, 2, 2)
-# plt.plot(test_value_loss_list, linewidth=1.0, label='Testing Value Loss')
-# plt.title("Value (Critic) Loss - Testing Data")
-# plt.xlabel("Epoch")
-# plt.ylabel("Loss")
-# plt.legend()
+plt.subplot(1, 2, 2)
+plt.plot(test_value_loss_list, linewidth=1.0, label='Testing Value Loss')
+plt.title("Value (Critic) Loss - Testing Data")
+plt.xlabel("Epoch")
+plt.ylabel("Loss")
+plt.legend()
 
-# plt.tight_layout()
+plt.tight_layout()
 # plt.savefig("policy_test_loss.png")
-# # plt.show()
+plt.show()
 
 plt.plot(rl_return_list, 'c', label='RL')
 plt.plot(gvwy_return_list, 'g', label='GVWY')
@@ -492,5 +355,5 @@ plt.legend()
 plt.xlabel('Iterations')
 plt.ylabel('Mean Returns')
 plt.title('Policy Improvement')
-plt.savefig('policy_improv_AC.png')
-# plt.show()
+# plt.savefig('policy_improv_AC.png')
+plt.show()

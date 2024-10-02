@@ -64,6 +64,7 @@ class Network(nn.Module):
             The output of the network after passing through the sequential layers.
         """
         return self.network(x)
+
     
 
 # # Example usage

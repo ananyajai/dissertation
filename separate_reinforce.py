@@ -195,42 +195,6 @@ plt.show()
 
 gamma_list = np.linspace(0, 1, 11)
 
-# # Start training
-# for gamma in gamma_list:
-#     stats, mean_return_list, valid_loss_list, test_loss_list = train(
-#         total_eps=CONFIG['total_eps'],
-#         eval_freq=CONFIG["eval_freq"],
-#         market_params=(sess_id, start_time, end_time, trader_spec, order_schedule, dump_flags, verbose),
-#         gamma=gamma,
-#         batch_size=CONFIG["batch_size"]
-#     )
-
-#     value_loss = stats['v_loss']
-#     plt.plot(value_loss, linewidth=1.0)
-#     plt.title(f"Value Loss - Training Data, gamma = {gamma}")
-#     plt.xlabel("Epoch")
-#     plt.savefig(f"training_loss_g{gamma}.png")
-#     plt.close()
-#     # plt.show()
-
-#     x_ticks = np.arange(CONFIG['eval_freq'], CONFIG['total_eps']+1, CONFIG['eval_freq'])
-#     plt.plot(x_ticks, test_loss_list, 'c')
-#     # plt.plot(x_ticks, valid_loss_list, 'g')
-#     plt.title(f"Value Loss - Testing Data, gamma = {gamma}")
-#     # plt.legend(['Testing Loss', 'Validation Loss'])
-#     plt.xlabel("Epoch")
-#     plt.savefig(f"testing_loss_g{gamma}.png")
-#     plt.close()
-#     # plt.show()
-
-#     plt.plot(x_ticks, valid_loss_list, linewidth=1.0)
-#     plt.title(f"Value Loss - Validation Data, gamma = {gamma}")
-#     plt.xlabel("Epoch")
-#     plt.savefig(f"valid_loss_g{gamma}.png")
-#     plt.close()
-#     # plt.show()
-
-
 # # Set up the subplot grid
 # fig_training, axs_training = plt.subplots(3, 4, figsize=(20, 15))
 # fig_testing, axs_testing = plt.subplots(3, 4, figsize=(20, 15))

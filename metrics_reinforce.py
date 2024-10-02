@@ -235,6 +235,18 @@ def train(
 def evaluate(
         obs_list, action_list, reward_list, value_net
     ) -> float:
+    """
+    Evaluates the performance of a trained value network on a set of episodes.
+
+    Args:
+        obs_list (list): A list of lists containing observations for each episode.
+        action_list (list): A list of lists containing actions for each episode.
+        reward_list (list): A list of lists containing rewards for each episode.
+        value_net (torch.nn.Module): The trained value network model.
+
+    Returns:
+        float: The average value loss (mean squared error) across all episodes.
+    """
 
     total_loss = 0.0
     num_episodes = len(obs_list)
@@ -269,7 +281,11 @@ def evaluate(
     return average_loss
 
 
-def eval_mean_returns(num_trials, value_net, market_params, norm_params:tuple=(0, 1), model_path:str = 'value_net_checkpoint.pt'):
+def eval_mean_returns(
+        num_trials, value_net, market_params, 
+        norm_params:tuple=(0, 1), 
+        model_path:str = 'value_net_checkpoint.pt'
+    ):
     # value_net.load_state_dict(torch.load(model_path))
     value_net.eval()
 
